@@ -66,4 +66,12 @@ Tab identities and the socket are saved in Herdr shared state, and creation lock
 
 `workflow-tabs.js` is the common helper source, embedded between WORKFLOW_TABS markers in both mods so neither mod needs to read another mod's code at runtime. Its regression test checks those embedded copies stay synchronized.
 
-Verification: `node check-sidebar.cjs`, `node check-board-performance.cjs`, `node check-diff.cjs`, `node check-workflow-tabs.cjs`, `node check-agent-launch.cjs`, `node check-project-identity.cjs`, and `herdr-app check` on the installed mods. The diff tests use temporary Git repositories and mocked message delivery, never send to actual agents. The tab helper test checks rapid-click deduplication and uses a temporary clean Neovim server to verify file switching and preservation of unsaved edits.
+Verification: `node check-sidebar.cjs`, `node check-board-performance.cjs`, `node check-diff.cjs`, `node check-workflow-tabs.cjs`, `node check-agent-launch.cjs`, `node check-project-identity.cjs`, `node check-task-commits.cjs`, `node check-worktree-launch.cjs`, and `herdr-app check` on the installed mods. The diff tests use temporary Git repositories and mocked message delivery, never send to actual agents. The tab helper test checks rapid-click deduplication and uses a temporary clean Neovim server to verify file switching and preservation of unsaved edits.
+
+## Worktrunk worktrees
+
+The tab-bar + menu’s New worktree action opens a form for the Herdr worktree name, Git branch (defaults to that name), an agent or shell, and an agent role. Supported agents appear in a three-column grid with their logos; unavailable agents are disabled and marked Not installed. The name labels the space; the directory follows wt’s branch-based path template. A known branch uses wt switch, while a new branch uses wt switch --create. A wt --execute callback confirms its switched directory before the selected agent is started there. Agent names keep the usual role suffix rules.
+
+The launcher preserves wt configuration and hook approval rules. On a failed agent launch, retry the same form to reuse the prepared worktree. When the folder already has a Herdr space, the agent opens as a new tab there. Worktrunk and Python 3 must be available on the target machine; no real agents are started by regression tests.
+
+Select **None — shell only** in the worktree launcher to open the configured shell without an agent. Mode controls are hidden for this option, and no agent prompt or role is assigned.

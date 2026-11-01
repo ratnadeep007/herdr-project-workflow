@@ -32,10 +32,10 @@ export default class NewMenu extends View {
       cx.notify();
     });
   }
-  configure(agent) {
+  configure(agent,worktree=false) {
     const space=spaces().find(s=>s.active);
     const folder=panes().find(p=>p.focused&&p.cwd)?.cwd||panes().find(p=>space?.tabs.some(t=>t.id===p.tab)&&p.cwd)?.cwd||space?.folder;
-    openOverlay({mod:"project-agent-launch",kind:"dialog",width:520,height:410,props:{agent,space:space?.id,folder}});
+    openOverlay({mod:"project-agent-launch",kind:"dialog",width:worktree?600:520,height:worktree?690:410,props:{agent,space:space?.id,folder,on:space?.machine,worktree}});
   }
   row(id, icon, name, action, hint = "", enabled = true) {
     const t = theme();
@@ -66,7 +66,7 @@ export default class NewMenu extends View {
         .when(this.agents.length === 0, el => el.child(div().px(9).py(6).text_color(t.dim).child(this.failed ? "Could not load agents" : "Checking installed agents…"))))
       .child(div().h(1).mx(4).my(5).bg(t.border))
       .child(this.row("space", div().w(14).child("+"), "New space", () => run("space.new"), shortcut("space.new")))
-      .child(this.row("worktree", svg("mods/workspace-chrome/branch.svg").size(14), "New worktree…", () => openOverlay({ mod: "worktree", kind: "dialog", width: 460, height: 280, props: { space: space?.id, folder: panes().find(p => p.focused)?.cwd, action: "new" } }), "", Boolean(space)))
+      .child(this.row("worktree", svg("mods/workspace-chrome/branch.svg").size(14), "New worktree…", () => this.configure(null,true), "", Boolean(space)))
       .child(this.row("worktree-open", svg("mods/workspace-chrome/branch.svg").size(14), "Open worktree\u2026", () => openOverlay({ mod: "worktree", kind: "dialog", width: 560, height: 480, props: { space: space?.id, folder: panes().find(p => p.focused)?.cwd, action: "open" } }), "", Boolean(space)));
   }
 }

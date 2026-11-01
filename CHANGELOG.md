@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add a Worktrunk launcher under **+ → New worktree…**, with worktree name, branch override (defaulting to the name), agent selection, role, and optional tab name. Worktrunk confirms its switched directory before the terminal starts. Existing branches and spaces are reused, and failed agent startup can retry without re-creating the worktree.
+- Add **None — shell only** to open the configured shell without an agent prompt or role.
+- Display supported agents in a three-column grid with logos, installed agents first, and unavailable agents disabled. Fixed tile heights keep Codex and other options from being clipped.
+
 ## 0.1.1
 
 Each top-level task is one self-contained commit. Nested checklist subtasks stay on their parent card, with progress and titles on hover. Updated the workflow skill and examples to keep implementation, tests, documentation, and review fixes together.
