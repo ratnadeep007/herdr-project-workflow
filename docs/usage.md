@@ -27,13 +27,20 @@ Installed layout: `project-workflow`. Switch layouts with Ctrl–Shift–L.
 Task format:
 
 ```markdown
-- [ ] A task to plan
-- [ ] Implement feature <!-- herdr:{"state":"doing","agent":"t2"} -->
-- [ ] Review feature <!-- herdr:{"state":"review","agent":"t7"} -->
-- [x] Completed feature
+- [ ] T1 — Reject invalid email addresses <!-- herdr:{"state":"doing","agent":"t3"} -->
+  - [x] Add validation and field feedback.
+  - [ ] Test valid, invalid, and empty input.
+  - [ ] Verify acceptance and review the complete change.
+  Acceptance: invalid email prevents submission; valid email can be submitted.
+  Commit: `feat: validate email addresses (T1)`.
+
+- [ ] T2 — Add task list empty state <!-- herdr:{"state":"todo","agent":null} -->
+  - [ ] Implement the empty state and create-task action.
+  - [ ] Add tests and review the complete change.
+  Commit: `feat: add task list empty state (T2)`.
 ```
 
-Standard checklists work without annotations. The board adds annotations only when a card is changed. Column buttons write the state and update the checkbox. Assign agent cycles through agents in the same project, including an unassigned option. Go to agent focuses its terminal. These actions do not send prompts or launch agents.
+Each flush-left checklist entry is one parent card and one self-contained commit. Indented checklist entries are subtasks: their progress appears on the parent, with titles on hover. Subtask checks do not automatically complete the parent. Implementation, tests, documentation, and review fixes for that outcome belong in the same commit. Standard top-level checklists work without annotations. The board adds annotations only when a card is changed. Column buttons write the state and update the checkbox. Assign agent cycles through agents in the same project, including an unassigned option. Go to agent focuses its terminal. These actions do not send prompts or launch agents.
 
 Keep agent ownership explicit: agents can edit the same metadata in tasks.md. A checked checkbox takes precedence over metadata. In-progress and Review are workflow states; an agent being idle does not move the card automatically.
 

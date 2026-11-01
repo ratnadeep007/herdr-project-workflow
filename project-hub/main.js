@@ -163,16 +163,25 @@ const ROLES = ["Planner", "Implementer", "Reviewer"];
 const STATES = ["todo", "doing", "review", "done"];
 const TITLES = {todo:"Todo", doing:"In progress", review:"Review", done:"Done"};
 function parse(text) {
-  let fenced = false;
-  return text.split("\n").flatMap((raw, index) => {
-    if (/^\s*(```|~~~)/.test(raw)) { fenced = !fenced; return []; }
-    const m = !fenced && /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\]\s+(.*)$/.exec(raw);
-    if (!m) return [];
-    const meta = /<!-- herdr:(.*?) -->/.exec(m[3]);
-    let fields = {}; try { fields = meta ? JSON.parse(meta[1]) : {}; } catch (_) {}
-    return [{index, raw, prefix:m[1], title:m[3].replace(/<!-- herdr:.*? -->/, "").trim(), state:m[2].toLowerCase()==="x"?"done":STATES.includes(fields.state)&&fields.state!=="done"?fields.state:"todo", agent:fields.agent||null}];
-  });
+  let fenced=false,current=null;
+  const tasks=[];
+  for(const [index,raw] of text.split("\n").entries()) {
+    if(/^\s*(```|~~~)/.test(raw)){fenced=!fenced;continue;}
+    if(fenced)continue;
+    const m=/^((?:[-*+]|\d+[.)])\s+)\[([ xX])\]\s+(.*)$/.exec(raw);
+    if(m) {
+      const meta=/<!-- herdr:(.*?) -->/.exec(m[3]);
+      let fields={};try{fields=meta?JSON.parse(meta[1]):{};}catch(_){}
+      current={index,raw,prefix:m[1],title:m[3].replace(/<!-- herdr:.*? -->/,"").trim(),state:m[2].toLowerCase()==="x"?"done":STATES.includes(fields.state)&&fields.state!=="done"?fields.state:"todo",agent:fields.agent||null,subtasks:[]};
+      tasks.push(current);continue;
+    }
+    const child=/^\s+(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/.exec(raw);
+    if(child&&current)current.subtasks.push({index,checked:child[1].toLowerCase()==="x",title:child[2].replace(/<!-- herdr:.*? -->/,"").trim()});
+    else if(/^\S/.test(raw))current=null;
+  }
+  return tasks;
 }
+
 export default class ProjectHub extends View {
   init(_p, cx) {
     this.stacks = {}; this.roots = {}; this.taskCache = {}; this.tasks = []; this.text = null; this.error = null;
@@ -302,6 +311,7 @@ export default class ProjectHub extends View {
             const agent=byAddress.get(task.agent);
             return v_flex().p(10).gap(8).rounded(8).border_1().border_color(t.border).bg(t.background)
               .child(div().child(task.title))
+              .when(Boolean(task.subtasks?.length),e=>e.child(div().text_size(10).text_color(t.muted).tooltip(task.subtasks.map(sub=>`${sub.checked?"☑":"☐"} ${sub.title}`).join("\n")).child(`${task.subtasks.filter(sub=>sub.checked).length}/${task.subtasks.length} subtasks · one commit`)))
               .child(this.button(`owner-${task.index}`, agent?`${this.role(agent,data.roles)} · ${agent.address} · ${agent.status}`:task.agent?`${task.agent} · offline`:"Assign agent",(_e,cx)=>this.update(task,{agent:choices[(choices.indexOf(task.agent)+1)%choices.length]},cx),t).tooltip("Click to cycle through this project's agents; assignment does not send a prompt"))
               .when(Boolean(agent),e=>e.child(this.button(`focus-${task.index}`,"Go to agent",()=>run("agent.focus",{terminal:agent.address}),t)))
               .child(h_flex().gap(4).children(STATES.filter(v=>v!==state).map(v=>this.button(`state-${task.index}-${v}`,TITLES[v],(_e,cx)=>this.update(task,{state:v},cx),t))));

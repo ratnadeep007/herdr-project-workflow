@@ -19,15 +19,25 @@ With no arguments, use the current conversation's project goal. If there is no g
 
 The specification should state the goal, scope, constraints, design/interfaces, and testable acceptance criteria. Mark unresolved choices as questions or assumptions. Scale its detail to the project.
 
-Break the work into independently verifiable tasks, with stable identifiers such as T1, T2, T3. Include planning, implementation, verification, and review where they serve the goal. Put dependencies and acceptance details in ordinary paragraphs beneath checklist entries, rather than additional checklist entries that would become unintended cards. Link tasks to the relevant specification criteria.
+Each top-level task is one self-contained, independently reviewable commit, with a stable identifier such as T1, T2, or T3. Scope it around one outcome and include the implementation, relevant tests, documentation, and necessary verification for that outcome together. Split a task if it needs multiple unrelated commits. Do not make implementation, tests, and review of the same outcome separate top-level cards; they are subtasks or workflow stages of that card. A planning/documentation change can be its own task when it is a useful standalone commit.
 
-Every Kanban card must be one Markdown checklist line outside a fenced code block:
+Write top-level checklist entries flush left. Put subtasks in indented checklists beneath their parent; they do not become separate Kanban cards or commits. Keep dependencies, acceptance criteria, and the intended commit message in indented prose beneath that task. Link acceptance criteria to the specification. Use one owner for the parent at a time and hand that same card to the reviewer.
+
+Every Kanban card must be one flush-left Markdown checklist line outside a fenced code block:
 
 ```markdown
-- [ ] T1 — Define acceptance criteria <!-- herdr:{"state":"todo","agent":null} -->
-- [ ] T2 — Implement the approved behavior <!-- herdr:{"state":"doing","agent":"t3"} -->
-- [ ] T3 — Review implementation and tests <!-- herdr:{"state":"review","agent":"t7"} -->
-- [x] T4 — Verify the release behavior <!-- herdr:{"state":"done","agent":"t3"} -->
+- [ ] T1 — Reject invalid email addresses <!-- herdr:{"state":"todo","agent":null} -->
+  - [ ] Implement email validation and field feedback.
+  - [ ] Add focused tests for valid, invalid, and empty input.
+  - [ ] Verify acceptance criteria and review the complete change.
+  Acceptance: invalid email prevents submission; valid email can be submitted.
+  Commit: `feat: validate email addresses (T1)`.
+
+- [ ] T2 — Add a password visibility toggle <!-- herdr:{"state":"todo","agent":null} -->
+  - [ ] Add an accessible show/hide control.
+  - [ ] Test toggling without changing the entered password.
+  - [ ] Verify and review the complete change.
+  Commit: `feat: add password visibility toggle (T2)`.
 ```
 
 Addresses in the example are illustrative. Use only verified live addresses for actual assignments, otherwise `null`. Valid states: `todo`, `doing`, `review`, `done`. A checked checkbox wins over metadata; a Done task must use `[x]`, and every other state uses `[ ]`. Metadata must remain single-line valid JSON inside exactly `<!-- herdr:... -->`. Preserve the task ID when moving or rewording a card. The board's update controls preserve only `state` and `agent`; keep dependencies, criteria, blockers, and role requirements outside this metadata.
@@ -40,10 +50,16 @@ When running inside Herdr and agent coordination is relevant, read `hc --skill` 
 
 Herdr's project sidebar detects roles from each agent's tab name and terminal title: `review` → Reviewer, `plan` or `orchestrat` → Planner, `impl` → Implementer. An explicit role chosen with the sidebar's ↻ button overrides that detection. Use unambiguous tab names `Planner`, `Implementer`, and `Reviewer` for newly authorized role tabs. Setting `agent` in a card assigns ownership; it does not set the agent's sidebar role, send a prompt, or start work.
 
-If an agent's work actually begins, set its task to `doing` with its verified address. On handoff, set the task to `review` and assign the actual reviewer, or leave ownership unassigned when none exists. Set `done` and check the box only after its acceptance criteria and necessary verification pass. An idle or exited agent is not proof a task is complete. Keep blocked tasks in their current column and explain the blocker in a paragraph beneath the card.
+If an agent's work actually begins, set its task to `doing` with its verified address. On handoff, set the task to `review` and assign the actual reviewer, or leave ownership unassigned when none exists. Set `done` and check the box only when all subtasks, acceptance criteria, necessary verification, and review have passed and the task is ready for its single commit. An idle or exited agent is not proof a task is complete. Keep blocked tasks in their current column and explain the blocker in a paragraph beneath the card.
 
 Agents working on files should claim and update their own tasks as they progress. Before saving, re-read tasks.md and preserve intervening edits from the board or other agents. Make targeted edits rather than replacing a stale full-file snapshot. After a restart, verify that a stored address still refers to the intended agent before reusing it.
 
+## Commit one task at a time
+
+When implementing authorized work, complete the parent task and all its subtasks together. Keep it as the same card through `doing` and `review`. Do not create separate commits for its subtasks, tests, or review fixes before the task is ready. Inspect the staged diff and stage only files or hunks belonging to that task; preserve other agents' and unrelated work. Include its checklist updates in that same commit when tasks.md is tracked. Use the intended commit message with the task ID. If committing fails, keep or return the card to an unfinished state. Report the actual commit hash after success; never invent a hash or write a placeholder as if committed. Do not push unless the user's request authorizes publishing.
+
+If implementation is not authorized, stop after preparing the planning files; this commit convention does not authorize implementation by itself.
+
 ## Finish
 
-Check the checklist syntax, checkbox/state agreement, task IDs, and acceptance links. Report the spec/task paths and unresolved questions. Explain how to open Tasks under the project in Herdr. Remote boards can display tasks, but their UI edits are currently disabled; agents can edit the remote tasks.md directly.
+Check the checklist syntax, checkbox/state agreement, task IDs, one-outcome commit boundaries, subtask nesting, and acceptance links. Report the spec/task paths and unresolved questions. Explain how to open Tasks under the project in Herdr. Remote boards can display tasks, but their UI edits are currently disabled; agents can edit the remote tasks.md directly.

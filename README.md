@@ -9,7 +9,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Project sidebar:** collapsible projects and roles, agent logos, exact pane navigation, pane counts, and current assigned tasks. Ordinary shells remain separate. Internal subagents appear only once they have their own pane.
 - **Project identity:** stable initials/colors, emoji or custom image overrides, parent paths for duplicate names, and stack details on hover.
 - **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
-- **Kanban:** Todo / In progress / Review / Done directly from a Markdown checklist. No separate task database.
+- **Kanban:** Todo / In progress / Review / Done directly from a Markdown checklist. Each top-level task is one self-contained commit; nested subtasks stay in that card, with progress and details on hover. No separate task database.
 - **Diff reviews:** working-tree or commit changes, file tree, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
 - **Usage pills:** Claude and Codex five-hour remaining percentages; weekly usage and reset details on hover. Optional at installation.
@@ -71,13 +71,15 @@ Restore refuses to overwrite files edited since that installation. Back up or re
 Example `tasks.md`:
 
 ```markdown
-- [ ] T1 — Define acceptance criteria <!-- herdr:{"state":"todo","agent":null} -->
-- [ ] T2 — Implement the feature <!-- herdr:{"state":"doing","agent":"t3"} -->
-- [ ] T3 — Review the feature <!-- herdr:{"state":"review","agent":"t7"} -->
-- [x] T4 — Verify acceptance <!-- herdr:{"state":"done","agent":null} -->
+- [ ] T1 — Reject invalid email addresses <!-- herdr:{"state":"todo","agent":null} -->
+  - [ ] Add validation and accessible field feedback.
+  - [ ] Add tests for valid, invalid, and empty input.
+  - [ ] Verify and review the complete change.
+  Acceptance: invalid email prevents submission; valid email can be submitted.
+  Commit: `feat: validate email addresses (T1)`.
 ```
 
-`t3` and `t7` are examples: assign actual live addresses. Card ownership does not send a prompt or start work. The board refreshes about every five seconds. See [the detailed guide](docs/usage.md) for review delivery, task ownership, pane grouping, and editor behavior.
+Use actual live terminal addresses for ownership. Keep parent tasks flush left and indent their subtasks. Implementation, tests, documentation, and review fixes for one parent are committed together; review is a stage of that same card. See [the complete example](examples/tasks.md). Card ownership does not send a prompt or start work. The board refreshes about every five seconds. See [the detailed guide](docs/usage.md) for review delivery, task ownership, pane grouping, and editor behavior.
 
 ## Account data and local state
 

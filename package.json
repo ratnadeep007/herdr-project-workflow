@@ -1,6 +1,6 @@
 {
   "name": "herdr-project-workflow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Project sidebar, Kanban, diff reviews and reusable Neovim tabs for Herdr",
   "license": "Apache-2.0",
