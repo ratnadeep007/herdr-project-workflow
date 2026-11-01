@@ -185,6 +185,7 @@ function parse(text) {
 export default class ProjectHub extends View {
   init(_p, cx) {
     this.stacks = {}; this.roots = {}; this.taskCache = {}; this.tasks = []; this.text = null; this.error = null;
+    if(this.isPopup()){this.popupHandle=cx.focus_handle();this.popupHandle.focus();}
     this.refresh(cx);
     cx.timer.every(5000, cx => this.refresh(cx));
   }
@@ -354,13 +355,125 @@ export default class ProjectHub extends View {
     const folder=cwd?.split(/[\\/]/).filter(Boolean).pop();
     return `${p.terminal||"Panel"} · ${program}${folder?` · ${folder}`:""}`;
   }
+  isPopup() {const p=props();return Boolean(p?.popup||(p?.overlay&&!p?.board));}
+  dismissPopup() {
+    const p=props();if(this.isPopup()&&p?.overlay)closeOverlay(p.overlay);
+  }
+  popupKey(event,cx) {
+    if(event.modifiers?.control||event.modifiers?.alt||event.modifiers?.platform)return;
+    if(event.key==="escape"){cx.stop_propagation();this.dismissPopup();return;}
+    const rows=(this.popupRows||[]).filter(row=>row.selectable),at=rows.findIndex(row=>row.id===this.popupSelected),row=rows[at];
+    if(!row)return;
+    if(event.key==="down")this.popupSelected=rows[(at+1)%rows.length].id;
+    else if(event.key==="up")this.popupSelected=rows[(at+rows.length-1)%rows.length].id;
+    else if(event.key==="home")this.popupSelected=rows[0].id;
+    else if(event.key==="end")this.popupSelected=rows[rows.length-1].id;
+    else if(event.key==="left") {
+      if(row.foldKey&&!row.closed)this.toggle(row.foldKey,row.fallback);
+      else if(row.parent)this.popupSelected=row.parent;
+    }else if(event.key==="right") {
+      if(row.foldKey&&row.closed)this.toggle(row.foldKey,row.fallback);
+      else {const child=rows.find(child=>child.parent===row.id);if(child)this.popupSelected=child.id;}
+    }else if(event.key==="enter") {
+      if(row.target){cx.stop_propagation();this.focusDestination(row.target.space,row.target.tab,row.target.pane);return;}
+      if(row.foldKey)this.toggle(row.foldKey,row.fallback);
+    }else if((event.key==="space"||event.key===" ")&&row.foldKey)this.toggle(row.foldKey,row.fallback);
+    else return;
+    this.popupEnsureVisible=true;cx.stop_propagation();cx.notify();
+  }
+  buildPopupRows(groups,data,all,identities,t) {
+    const rows=[],add=(id,parent,build,height,depth=0,fields={})=>rows.push({id,parent,build,height,depth,selectable:false,...fields});
+    for(const g of groups) {
+      const root=this.project(g.s),members=this.members(g.s,data,all),active=g.spaces.some(s=>s.active),identity=projectIdentity(root,g.s.machine,identities);
+      const projectPanes=data.panes.filter(p=>g.spaces.some(s=>s.tabs.some(tab=>tab.id===p.tab))),known=new Set(members.map(a=>a.address)),cache=this.taskCache[g.id];
+      const count=kind=>projectPanes.filter(p=>this.paneKind(p,known,data)===kind).length;
+      const paneCounts=[[members.length,"agent"],[count("Shells"),"shell"],[count("Programs"),"program"],[count("Panels"),"panel"]].filter(([n])=>n>0).map(([n,label])=>`${n} ${label}${n===1?"":"s"}`).join(" · ")||"No open panes";
+      const key=`project:${g.id}`,closed=this.folded(key,!active),stack=this.stacks?.[g.id]?.labels||[];
+      const details=`${g.s.machine||"Local"} · ${root}${stack.length?"\n"+stack.join(" · "):""}`;
+      add(key,null,()=>h_flex().gap(4).items_center()
+        .child(this.button(`fold-${g.id}`,closed?"▸":"▾",()=>this.toggle(key,!active),t))
+        .child(div().id(`project-icon-${g.id}`).cursor_pointer().tooltip(`Change project icon\n${details}`).on_click((_e,cx)=>{cx.stop_propagation();this.dismissPopup();openOverlay({mod:"project-icon",kind:"dialog",width:470,height:470,props:{root,on:g.s.machine}});}).child(projectBadge(identity)))
+        .child(div().id(`project-${g.id}`).flex_1().min_w(0).font_semibold().truncate().cursor_pointer().tooltip(details).on_click(()=>this.focusDestination(g.s.id)).child(identity.name))
+        .child(div().text_size(10).text_color(t.dim).tooltip(`${projectPanes.length} open panes\n${paneCounts}`).child(`${projectPanes.length}p`)),38,0,{selectable:true,foldKey:key,closed,fallback:!active,target:{space:g.s.id},active});
+      if(groups.some(other=>other.id!==g.id&&projectName(this.project(other.s))===identity.name)) {
+        const parent=String(root||"").replace(/[\\/][^\\/]+[\\/]?$/,"");
+        add(`parent:${g.id}`,key,()=>div().text_size(10).text_color(t.dim).truncate().tooltip(details).child(`${g.s.machine||"Local"} · ${parent}`),20);
+      }
+      if(!closed) {
+        add(`summary:${g.id}`,key,()=>div().text_size(10).text_color(t.dim).child(paneCounts),20);
+        if(cache?.tasks?.some(task=>["doing","review"].includes(task.state)))add(`progress:${g.id}`,key,()=>div().text_size(10).text_color(t.working).child(`${cache.tasks.filter(task=>task.state==="doing").length} in progress · ${cache.tasks.filter(task=>task.state==="review").length} in review`),20);
+        add(`actions:${g.id}`,key,()=>h_flex().gap(4)
+          .when(Boolean(cache?.tasks?.length),e=>e.child(this.button(`board-${g.id}`,"Tasks",()=>{run("space.select",{id:g.s.id});this.dismissPopup();openOverlay({mod:"project-hub",props:{board:true},kind:"dialog",width:1100,height:650});},t)))
+          .child(this.button(`diff-${g.id}`,"Diff",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowDiff({space:g.s.id,spaceIds:g.spaces.map(s=>s.id),root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t))
+          .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t)),32);
+        const grouped=this.tabGroups(g.spaces,projectPanes,members,data);
+        for(const kind of [...new Set([...ROLES,...members.map(a=>this.role(a,data.roles)),"Unassigned","Shells","Programs","Panels"])]) {
+          const tabs=grouped.filter(group=>group.kind===kind);if(!tabs.length)continue;
+          const rk=`tab-kind:${g.id}:${kind}`,folded=this.folded(rk);
+          add(rk,key,()=>div().id(rk).text_size(10).text_color(t.dim).cursor_pointer().on_click(()=>this.toggle(rk)).child(`${folded?"▸":"▾"} ${kind} · ${tabs.length} ${tabs.length===1?"tab":"tabs"}`),28,1,{selectable:true,foldKey:rk,closed:folded});
+          if(folded)continue;
+          for(const group of tabs) {
+            let parent=rk,depth=2;
+            if(group.panes.length>1) {
+              const tk=`tab-panes:${group.tab.id}:${group.kind}`,tabClosed=this.folded(tk);
+              add(tk,rk,()=>h_flex().gap(3).items_center()
+                .child(this.button(`fold-tab-${group.tab.id}-${group.kind}`,tabClosed?"▸":"▾",()=>this.toggle(tk),t))
+                .child(div().id(`select-tab-${group.tab.id}-${group.kind}`).flex_1().min_w(0).truncate().font_semibold().cursor_pointer().on_click(()=>this.focusDestination(group.space.id,group.tab.id)).child(`Tab: ${group.tab.name}`))
+                .child(div().text_size(10).text_color(t.dim).child(`${group.panes.length} panes`)),32,2,{selectable:true,foldKey:tk,closed:tabClosed,target:{space:group.space.id,tab:group.tab.id}});
+              if(tabClosed)continue;parent=tk;depth=3;
+            }
+            for(const a of group.agents)add(`agent:${a.address}`,parent,()=>this.agentRow(a,cache,projectPanes,t),68,depth,{selectable:true,target:{space:a.space,tab:a.tab,pane:a.pane}});
+            for(const pane of group.extras)add(`pane:${pane.pane}`,parent,()=>this.paneRow(pane,group.tab,group.space,t,data),32,depth,{selectable:true,target:{space:group.space.id,tab:group.tab.id,pane:pane.pane}});
+          }
+        }
+      }
+      add(`gap:${g.id}`,null,()=>div(),8);
+    }
+    return rows;
+  }
+  popupView(groups,data,all,identities,t) {
+    const rows=this.buildPopupRows(groups,data,all,identities,t),byId=new Map(rows.map(row=>[row.id,row])),oldRows=new Map((this.popupRows||[]).map(row=>[row.id,row]));
+    let selected=this.popupSelected;
+    while(selected&&!byId.has(selected))selected=oldRows.get(selected)?.parent;
+    const currentPane=data.panes.find(p=>p.focused)?.pane;
+    if(!selected)selected=rows.find(row=>row.target?.pane===currentPane&&currentPane)?.id||rows.find(row=>row.active)?.id||rows.find(row=>row.selectable)?.id;
+    if(selected!==this.popupSelected)this.popupEnsureVisible=true;
+    this.popupSelected=selected;this.popupRows=rows;
+    let total=0;const tops=rows.map(row=>{const top=total;total+=row.height;return top;});
+    const height=this.popupListHeight||588,maxScroll=Math.max(0,total-height);
+    this.popupScroll=Math.max(0,Math.min(this.popupScroll||0,maxScroll));
+    if(this.popupEnsureVisible) {
+      const index=rows.findIndex(row=>row.id===selected);
+      if(index>=0){if(tops[index]<this.popupScroll)this.popupScroll=tops[index];if(tops[index]+rows[index].height>this.popupScroll+height)this.popupScroll=tops[index]+rows[index].height-height;}
+      this.popupEnsureVisible=false;
+    }
+    return v_flex().w(380).h(650).min_h(0).rounded(10).bg(t.chrome).text_color(t.foreground).text_size(12).track_focus(this.popupHandle)
+      .on_key_down((event,cx)=>this.popupKey(event,cx))
+      .child(h_flex().h(38).flex_none().px(12).items_center().child(div().flex_1().font_semibold().child("Projects & agents"))
+        .child(this.button("new-project","+",()=>{this.dismissPopup();run("space.new");},t))
+        .child(this.button("close-project-switcher","×",()=>this.dismissPopup(),t).tooltip("Close")))
+      .child(div().id("popup-projects-scroll").relative().flex_1().min_h(0).overflow_hidden()
+        .on_size_change((size,cx)=>{if(size.height>0&&Math.abs((this.popupListHeight||0)-size.height)>1){this.popupListHeight=size.height;this.popupEnsureVisible=true;cx.notify();}})
+        .on_scroll_wheel((event,cx)=>{this.popupScroll=Math.max(0,Math.min((this.popupScroll||0)-event.delta.y,maxScroll));this.popupEnsureVisible=false;cx.stop_propagation();cx.notify();})
+        .children(rows.flatMap((row,index)=>tops[index]+row.height>this.popupScroll&&tops[index]<this.popupScroll+height?
+          [div().id(`popup-row-${row.id}`).absolute().left(4).right(4).top(tops[index]-this.popupScroll).h(row.height).pl(4+row.depth*8).pr(4).rounded(6).flex().items_center()
+            .when(row.id===selected,e=>e.bg(t.selected).border_l(2).border_color(t.accent))
+            .child(row.build().w_full())]:[])))
+      .child(div().h(24).flex_none().px(12).text_size(10).text_color(t.dim).child("↑↓ move · ←→ fold · Enter switch · Esc close"));
+  }
+  focusDestination(space,tab,pane) {
+    if(space)run("space.select",{id:space});
+    if(tab)run("tab.select",{id:tab});
+    if(pane)run("pane.focus",{pane});
+    this.dismissPopup();
+  }
   agentRow(a, cache, allPanes, t) {
     const assigned=this.taskLabel(a.address,cache),status=a.status||"unknown";
     return v_flex().gap(1).pb(5)
       .child(h_flex().gap(4).items_center()
         .child(h_flex().id(`agent-${a.address}`).flex_1().min_w(0).py(5).gap(6).items_center().cursor_pointer()
           .tooltip(`${a.program?.name||"Agent"} · ${a.address} · ${status}`)
-          .on_click(()=>run("pane.focus",{pane:a.pane})).child(this.logo(a,t))
+          .on_click(()=>this.focusDestination(a.space,a.tab,a.pane)).child(this.logo(a,t))
           .child(div().flex_1().min_w(0).truncate().text_color(t[status]||t.muted).child(`${a.address} · ${a.tab_name||a.program?.name||"Agent"}`)))
         .child(this.button(`role-${a.address}`,"↻",()=>{const roles={...(shared("project.roles")||{})};roles[a.address]=ROLES[(ROLES.indexOf(this.role(a))+1)%ROLES.length];setShared("project.roles",roles);},t).tooltip("Cycle role: Planner → Implementer → Reviewer")))
       .child(div().pl(21).text_size(10).text_color(t.dim).child(status))
@@ -389,7 +502,7 @@ export default class ProjectHub extends View {
     const kind=this.paneKind(p,new Set(),data);
     return h_flex().id(`pane-${p.pane}`).py(5).gap(6).items_center().cursor_pointer()
       .tooltip(`${kind==="Shells"?"Shell":p.program?.name||p.mod} · ${p.cwd||""} · Tab: ${tab.name}`)
-      .on_click(()=>{run("space.select",{id:space.id});run("tab.select",{id:tab.id});run("pane.focus",{pane:p.pane});})
+      .on_click(()=>this.focusDestination(space.id,tab.id,p.pane))
       .child(p.program?this.logo(p,t):svg("icons/agent.svg").size(15).text_color(t.dim))
       .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(this.paneLabel(p,data)))
       .child(div().text_size(10).text_color(t.dim).child(kind==="Shells"?"shell":kind==="Panels"?"panel":"app"));
@@ -403,7 +516,7 @@ export default class ProjectHub extends View {
         .child(this.button(`fold-tab-${tab.id}-${group.kind}`,closed?"▸":"▾",()=>this.toggle(key),t))
         .child(div().id(`select-tab-${tab.id}-${group.kind}`).flex_1().min_w(0).truncate().font_semibold().cursor_pointer()
           .tooltip(`${space.name} / ${tab.name} · ${group.panes.length} panes in this tab`)
-          .on_click(()=>{run("space.select",{id:space.id});run("tab.select",{id:tab.id});}).child(`Tab: ${tab.name}`))
+          .on_click(()=>this.focusDestination(space.id,tab.id)).child(`Tab: ${tab.name}`))
         .child(div().text_size(10).text_color(t.dim).child(`${group.panes.length} panes`)))
       .when(!closed,e=>e.child(v_flex().ml(8).pl(8).border_l(1).border_color(t.border)
         .children(agents.map(a=>this.agentRow(a,cache,allPanes,t)))
@@ -412,12 +525,13 @@ export default class ProjectHub extends View {
   render(cx) {
     const t=theme();
     if(props()?.board) return this.board(cx,t);
-    const data=this.snapshot(),all=this.allAgents(data),groups=[],identities=shared("project.identities")||{};
+    const popup=this.isPopup(),data=this.snapshot(),all=this.allAgents(data),groups=[],identities=shared("project.identities")||{};
     for(const s of data.spaces) {const id=JSON.stringify([s.machine,this.project(s)]);let g=groups.find(g=>g.id===id);if(!g){g={id,s,spaces:[]};groups.push(g);}g.spaces.push(s);}
     setAgentOrder(groups.flatMap(g=>this.members(g.s,data,all).map(a=>a.address)));
+    if(popup)return this.popupView(groups,data,all,identities,t);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_color(t.foreground).text_size(12)
-      .child(h_flex().h(38).px(12).items_center().child(div().flex_1().font_semibold().child("Projects & agents"))
-        .child(this.button("new-project","+",()=>run("space.new"),t)))
+      .child(h_flex().h(38).flex_none().px(12).items_center().child(div().flex_1().font_semibold().child("Projects & agents"))
+        .child(this.button("new-project","+",()=>{this.dismissPopup();run("space.new");},t)))
       .child(v_flex().id("projects-scroll").flex_1().min_h(0).overflow_y_scrollbar().px(8).gap(8).children(groups.map(g=>{
         const members=this.members(g.s,data,all),active=g.spaces.some(s=>s.active),root=this.project(g.s);
         const projectPanes=data.panes.filter(p=>g.spaces.some(s=>s.tabs.some(tab=>tab.id===p.tab)));
@@ -434,16 +548,16 @@ export default class ProjectHub extends View {
         let card=v_flex().p(8).gap(5).rounded(8).when(active,e=>e.bg(t.surface))
           .child(h_flex().gap(4).items_center()
             .child(this.button(`fold-${g.id}`,closed?"▸":"▾",()=>this.toggle(key,!active),t).tooltip(closed?"Expand project":"Collapse project"))
-            .child(div().id(`project-icon-${g.id}`).cursor_pointer().tooltip(`Change project icon\n${details}`).on_click((_e,cx)=>{cx.stop_propagation();openOverlay({mod:"project-icon",kind:"dialog",width:470,height:470,props:{root,on:g.s.machine}});}).child(projectBadge(identity)))
-            .child(div().id(`project-${g.id}`).flex_1().min_w(0).font_semibold().truncate().cursor_pointer().tooltip(details).on_click(()=>run("space.select",{id:g.s.id})).child(identity.name))
+            .child(div().id(`project-icon-${g.id}`).cursor_pointer().tooltip(`Change project icon\n${details}`).on_click((_e,cx)=>{cx.stop_propagation();this.dismissPopup();openOverlay({mod:"project-icon",kind:"dialog",width:470,height:470,props:{root,on:g.s.machine}});}).child(projectBadge(identity)))
+            .child(div().id(`project-${g.id}`).flex_1().min_w(0).font_semibold().truncate().cursor_pointer().tooltip(details).on_click(()=>this.focusDestination(g.s.id)).child(identity.name))
             .child(div().text_size(10).text_color(t.dim).tooltip(`${projectPanes.length} open panes\n${paneCounts}`).child(`${projectPanes.length}p`)));
         if(duplicate)card=card.child(div().pl(30).text_size(10).text_color(t.dim).truncate().tooltip(details).child(`${g.s.machine||"Local"} · ${parent}`));
         if(closed) return card;
         return card.child(div().text_size(10).text_color(t.dim).child(paneCounts))
           .when(Boolean(cache?.tasks?.some(task=>["doing","review"].includes(task.state))),e=>e.child(div().text_size(10).text_color(t.working).child(`${cache.tasks.filter(task=>task.state==="doing").length} in progress · ${cache.tasks.filter(task=>task.state==="review").length} in review`)))
-          .child(h_flex().gap(4).when(Boolean(cache?.tasks?.length),e=>e.child(this.button(`board-${g.id}`,"Tasks",()=>{run("space.select",{id:g.s.id});openOverlay({mod:"project-hub",props:{board:true},kind:"dialog",width:1100,height:650});},t)))
-            .child(this.button(`diff-${g.id}`,"Diff",(_e,cx)=>{cx.spawn(async cx=>{await workflowDiff({space:g.s.id,spaceIds:g.spaces.map(s=>s.id),root,on:g.s.machine});cx.notify();});},t))
-            .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();});},t)))
+          .child(h_flex().gap(4).when(Boolean(cache?.tasks?.length),e=>e.child(this.button(`board-${g.id}`,"Tasks",()=>{run("space.select",{id:g.s.id});this.dismissPopup();openOverlay({mod:"project-hub",props:{board:true},kind:"dialog",width:1100,height:650});},t)))
+            .child(this.button(`diff-${g.id}`,"Diff",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowDiff({space:g.s.id,spaceIds:g.spaces.map(s=>s.id),root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t))
+            .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t)))
           .children([...new Set([...ROLES,...members.map(a=>this.role(a,data.roles)),"Unassigned","Shells","Programs","Panels"])].flatMap(kind=>{
             const tabs=this.tabGroups(g.spaces,projectPanes,roots,data).filter(group=>group.kind===kind);
             if(!tabs.length)return [];

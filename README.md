@@ -6,7 +6,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 
 ## What it adds
 
-- **Project sidebar:** collapsible projects and roles, agent logos, exact pane navigation, pane counts, and current assigned tasks. Ordinary shells remain separate. Internal subagents appear only once they have their own pane.
+- **Project sidebar:** collapsible projects and roles, agent logos, exact pane navigation, pane counts, and current assigned tasks. When the sidebar is hidden, a **Projects** button in the tab bar opens the same information in a popup. Ordinary shells remain separate. Internal subagents appear only once they have their own pane.
 - **Project identity:** stable initials/colors, emoji or custom image overrides, parent paths for duplicate names, and stack details on hover.
 - **Worktrunk worktrees:** **+ → New worktree…** creates or switches a checkout with `wt`. Enter a worktree name and optional branch override, then choose an agent from a grid with logos or **None — shell only**. Agents also get a role and optional tab name. The branch defaults to the worktree name.
 - **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
@@ -81,6 +81,26 @@ Example `tasks.md`:
 ```
 
 Use actual live terminal addresses for ownership. Keep parent tasks flush left and indent their subtasks. Implementation, tests, documentation, and review fixes for one parent are committed together; review is a stage of that same card. See [the complete example](examples/tasks.md). Card ownership does not send a prompt or start work. The board refreshes about every five seconds. See [the detailed guide](docs/usage.md) for review delivery, task ownership, pane grouping, and editor behavior.
+
+## Switch with the sidebar hidden
+
+Click **Projects** on the left side of the tab bar when the sidebar is hidden. The same popup can also be opened with `herdr-app do mod.open '{"name":"project-hub"}'`. To bind it to **⌘P**, merge `"cmd-p": "mod.open:project-hub"` into the `global` object in your Herdr `keys.json` (use your preferred key on other platforms). This replaces that key’s existing picker binding; preserve the other entries in the file. The shortcut works with the sidebar either visible or hidden. The **Projects & agents** popup reuses the sidebar view: project icons, roles, agent status, task labels, pane counts, nested shells/programs, and Tasks / Diff / Editor actions.
+
+Expand or collapse groups as usual; their fold state is shared with the sidebar. Selecting a project, tab, or individual pane switches directly there and closes the popup. Escape, the close button, or clicking outside dismisses it. Opening the popup does not reopen or resize the sidebar.
+
+Keyboard controls in the popup:
+
+| Key | Action |
+| --- | --- |
+| ↑ / ↓ | Move the highlight through visible projects, groups, tabs, and panes |
+| → | Expand a group, or move into its first child |
+| ← | Collapse a group, or move to its parent |
+| Enter | Switch to the highlighted project, tab, or pane; toggle a role group |
+| Space | Toggle the highlighted group |
+| Home / End | Jump to the first or last item |
+| Escape | Close the popup |
+
+The selected row stays visible as you navigate. Moving the highlight does not switch your active project until you press Enter.
 
 ## Create a worktree with an agent or shell
 

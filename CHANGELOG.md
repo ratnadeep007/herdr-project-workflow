@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add keyboard tree navigation and a visible selection to the project popup, including automatic scrolling, group expansion/collapse, and Enter to switch.
+
+- Support opening the project switcher through `mod.open:project-hub`, including a ⌘P binding.
+
+- Add a Projects button when the sidebar is hidden. Its popup reuses the sidebar content, shared fold state, exact pane navigation, and project actions.
+
 - Add a Worktrunk launcher under **+ → New worktree…**, with worktree name, branch override (defaulting to the name), agent selection, role, and optional tab name. Worktrunk confirms its switched directory before the terminal starts. Existing branches and spaces are reused, and failed agent startup can retry without re-creating the worktree.
 - Add **None — shell only** to open the configured shell without an agent prompt or role.
 - Display supported agents in a three-column grid with logos, installed agents first, and unavailable agents disabled. Fixed tile heights keep Codex and other options from being clipped.

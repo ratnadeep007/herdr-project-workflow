@@ -66,7 +66,7 @@ Tab identities and the socket are saved in Herdr shared state, and creation lock
 
 `workflow-tabs.js` is the common helper source, embedded between WORKFLOW_TABS markers in both mods so neither mod needs to read another mod's code at runtime. Its regression test checks those embedded copies stay synchronized.
 
-Verification: `node check-sidebar.cjs`, `node check-board-performance.cjs`, `node check-diff.cjs`, `node check-workflow-tabs.cjs`, `node check-agent-launch.cjs`, `node check-project-identity.cjs`, `node check-task-commits.cjs`, `node check-worktree-launch.cjs`, and `herdr-app check` on the installed mods. The diff tests use temporary Git repositories and mocked message delivery, never send to actual agents. The tab helper test checks rapid-click deduplication and uses a temporary clean Neovim server to verify file switching and preservation of unsaved edits.
+Verification: `node check-sidebar.cjs`, `node check-board-performance.cjs`, `node check-diff.cjs`, `node check-workflow-tabs.cjs`, `node check-agent-launch.cjs`, `node check-project-identity.cjs`, `node check-task-commits.cjs`, `node check-worktree-launch.cjs`, `node check-project-switcher.cjs`, and `herdr-app check` on the installed mods. The diff tests use temporary Git repositories and mocked message delivery, never send to actual agents. The tab helper test checks rapid-click deduplication and uses a temporary clean Neovim server to verify file switching and preservation of unsaved edits.
 
 ## Worktrunk worktrees
 
@@ -75,3 +75,9 @@ The tab-bar + menu’s New worktree action opens a form for the Herdr worktree n
 The launcher preserves wt configuration and hook approval rules. On a failed agent launch, retry the same form to reuse the prepared worktree. When the folder already has a Herdr space, the agent opens as a new tab there. Worktrunk and Python 3 must be available on the target machine; no real agents are started by regression tests.
 
 Select **None — shell only** in the worktree launcher to open the configured shell without an agent. Mode controls are hidden for this option, and no agent prompt or role is assigned.
+
+## Sidebar popup
+
+With the sidebar hidden, the tab bar shows a Projects button. It opens the same project-hub view as a popup, including live agent status, role groups, task ownership, project icons, and individual panes. Folder/group folding stays shared with the sidebar. Selecting a project, tab, or pane closes the popup after navigation; expanding groups and cycling roles keep it open. Tasks opens its board, and Diff/Editor retain their existing tab reuse behavior. Escape and the header close button dismiss the popup.
+
+The project popup supports ↑/↓ selection, ←/→ tree navigation, Enter to switch, Space to toggle a group, Home/End to jump, and Escape to close. The highlight scrolls into view; keyboard selection alone does not change the active project.
