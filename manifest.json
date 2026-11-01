@@ -1,0 +1,40 @@
+{
+  "name": "herdr-project-workflow",
+  "version": "0.1.0",
+  "tested": {
+    "herdr-app": "0.1.11",
+    "hc": "0.1.16",
+    "platform": "macOS"
+  },
+  "mods": [
+    "project-hub",
+    "project-diff",
+    "project-tabs",
+    "project-new-menu",
+    "project-agent-launch",
+    "project-icon",
+    "usage-status"
+  ],
+  "files": [
+    "project-hub/main.js",
+    "project-hub/mod.json",
+    "project-diff/main.js",
+    "project-diff/mod.json",
+    "project-tabs/main.js",
+    "project-tabs/mod.json",
+    "project-tabs/win-close.svg",
+    "project-tabs/win-max.svg",
+    "project-tabs/win-min.svg",
+    "project-tabs/win-restore.svg",
+    "project-new-menu/main.js",
+    "project-new-menu/mod.json",
+    "project-agent-launch/main.js",
+    "project-agent-launch/mod.json",
+    "project-icon/main.js",
+    "project-icon/mod.json",
+    "usage-status/main.js",
+    "usage-status/mod.json",
+    "usage-status/usage.py",
+    "layouts/project-workflow.json"
+  ]
+}

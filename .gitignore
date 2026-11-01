@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+node_modules/
+dist/
+*.before-*
+**/gpui-kit.d.ts
+**/jsconfig.json
+project-icon/assets/

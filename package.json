@@ -1,0 +1,11 @@
+{
+  "name": "herdr-project-workflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Project sidebar, Kanban, diff reviews and reusable Neovim tabs for Herdr",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "python3 scripts/check.py",
+    "release": "python3 scripts/release.py"
+  }
+}

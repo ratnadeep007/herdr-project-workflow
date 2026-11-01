@@ -1,0 +1,13 @@
+Herdr Project Workflow
+Copyright 2026 Herdr Project Workflow contributors
+
+This project includes modified JavaScript mods from Herdr 0.1.11,
+distributed with Herdr under the Apache License, Version 2.0.
+The project-tabs and project-new-menu mods adapt Herdr tabs and new-menu;
+project-diff adapts its changes viewer. Modified files carry a notice.
+Window-control SVG assets in project-tabs originate from Herdr.
+
+Herdr and the agent product names belong to their respective owners.
+This is an independent community customization, not an official Herdr release.
+Herdr's executable, fonts, program logos and other runtime assets are not
+redistributed here; they are supplied by the user's Herdr installation.
