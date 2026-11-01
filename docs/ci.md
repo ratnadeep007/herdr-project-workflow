@@ -1,15 +1,11 @@
-# Enable GitHub Actions
+# GitHub Actions
 
-The repository includes `.github/workflow-templates/checks.yml`. To enable it:
+`.github/workflows/ci.yml` runs checks on pushes and pull requests. It tests on Ubuntu with Node.js 22, Python 3.11, and Neovim, then uploads a distribution ZIP and checksums as workflow artifacts.
+
+Native Herdr checks still run locally on a machine with Herdr installed:
 
 ```sh
-mkdir -p .github/workflows
-cp .github/workflow-templates/checks.yml .github/workflows/ci.yml
-git add .github/workflows/ci.yml
-git commit -m "Enable workflow checks"
-git push
+python3 scripts/check.py --native
 ```
 
-Use a GitHub credential allowed to create workflows (OAuth tokens require the `workflow` scope), or create the file through GitHub's web editor. The initial publishing credential did not have that scope, so this repository ships the template without enabling Actions.
-
-The workflow runs the portable tests on Ubuntu with Node.js, Python, and Neovim, then uploads a distribution ZIP and checksums. Native Herdr checks still run locally on a machine with Herdr installed.
+Changes to Actions workflows require an appropriate GitHub credential: use an authorized SSH key, or an OAuth token with the `workflow` scope.

@@ -95,7 +95,7 @@ python3 scripts/check.py --native  # additionally requires installed Herdr
 python3 scripts/release.py
 ```
 
-Checks cover mixed panes, large boards, diff comments and routing, tab reuse, real headless Neovim buffer preservation, agent naming, project identities, installer restore/rollback, and release contents. A GitHub Actions template runs the portable checks and builds the ZIP; see [CI setup](docs/ci.md) to enable it.
+Checks cover mixed panes, large boards, diff comments and routing, tab reuse, real headless Neovim buffer preservation, agent naming, project identities, installer restore/rollback, and release contents. GitHub Actions runs the portable checks and builds the ZIP; see [CI details](docs/ci.md).
 
 The release builder uses an allowlist and creates a reproducible ZIP plus `dist/SHA256SUMS`. Generated API definitions, caches, backups, local state, and custom images are omitted. `project-identity.js` and `workflow-tabs.js` are embedded into mods for Herdr's isolated runtime; their tests reject drift.
 
