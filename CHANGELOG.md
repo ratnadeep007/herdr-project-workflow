@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add collapsible diff folders and preserve nested fold preferences. Fix file-list and code scrolling with independent scroll areas and content that retains its full height.
+
 - Add keyboard tree navigation and a visible selection to the project popup, including automatic scrolling, group expansion/collapse, and Enter to switch.
 
 - Support opening the project switcher through `mod.open:project-hub`, including a ⌘P binding.

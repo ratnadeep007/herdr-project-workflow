@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Modified from Herdr 0.1.11: project workflow navigation and tools.
 import { View, div, image } from "gpui-kit";
-import { v_flex, h_flex, InputState, Input } from "gpui-base";
+import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, props, agents, shared, hc, setShared, run, notify } from "herdr";
 
 // PROJECT_IDENTITY_BEGIN
@@ -172,20 +172,22 @@ function diffRows(lines) {
   });
 }
 
-function treeRows(files) {
+function treeRows(files, collapsed=new Set()) {
   const rows = [], seen = new Set();
   for (const f of [...files].sort((a,b)=>a.path.localeCompare(b.path))) {
-    const parts=f.path.split('/');
+    const parts=f.path.split('/');let hidden=false;
     for(let i=1;i<parts.length;i++) {
       const path=parts.slice(0,i).join('/');
-      if(!seen.has(path)){seen.add(path);rows.push({folder:true,path,depth:i-1,name:parts[i-1]});}
+      if(!seen.has(path)){seen.add(path);rows.push({folder:true,path,depth:i-1,name:parts[i-1],collapsed:collapsed.has(path)});}
+      if(collapsed.has(path)){hidden=true;break;}
     }
-    rows.push({...f,depth:parts.length-1});
+    if(!hidden)rows.push({...f,depth:parts.length-1});
   }
   return rows;
 }
 export default class Changes extends View {
   init(_props, cx) {
+    this.collapsedFolders=new Set();
     this.files = []; this.rows = []; this.diffWidth = 0; this.message = ""; this.showCommits=true; this.commits=[]; this.revision=null; this.comments=[]; this.recipients=[]; this.anchor=null; this.selectedAgent=null; this.handle = cx.focus_handle();
     this.input = InputState.new({ placeholder: "Write a review comment…" });
     this.input.on("change", (_e, cx) => {
@@ -217,6 +219,7 @@ export default class Changes extends View {
     if (this.loading || this.busy) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
+      try {const saved=JSON.parse(localStorage.getItem("diff.folders:"+context)||"[]");this.collapsedFolders=new Set(Array.isArray(saved)?saved.filter(path=>typeof path==="string"):[]);}catch(_){this.collapsedFolders=new Set();}
       this.context = context; this.root = null; this.files = []; this.open = null; this.revision=props()?.revision||null; this.commits=[]; this.anchor=null; this.comments=[]; this.draftId=null; this.selectedAgent=null;
       this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null; this.watched = null; this.closed = false; this.limited = false;
     }
@@ -321,6 +324,13 @@ export default class Changes extends View {
     this.diffWidth = Math.max(300, ...lines.map(line => line.length * 7 + 50));
   }
 
+  toggleFolder(path,cx) {
+    const next=new Set(this.collapsedFolders||[]);
+    if(next.has(path))next.delete(path);else next.add(path);
+    this.collapsedFolders=next;
+    localStorage.setItem("diff.folders:"+this.context,JSON.stringify([...next]));
+    cx.notify();
+  }
   pick(path, cx) {
     this.open = this.open === path ? null : path; this.setLines([]); this.anchor=null; this.note = null;
     this.closed = !this.open;
@@ -463,6 +473,7 @@ export default class Changes extends View {
     if (key() !== this.context) this.refresh(cx);
     const t = theme(), add = this.files.reduce((n, f) => n + f.add, 0), del = this.files.reduce((n, f) => n + f.del, 0);
     const enabled = Boolean(this.message.trim() && this.root && !this.busy && !this.loading);
+    const files=treeRows(this.files,this.collapsedFolders),treeHeight=Math.min(280,Math.max(44,files.reduce((height,row)=>height+(row.folder?25:28),12)));
     return v_flex().id("changes").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13).track_focus(this.handle)
       .on_key_down((e, cx) => {
         if (e.key === "escape" && this.typing) { this.typing = false; this.handle.focus(); cx.stop_propagation(); cx.notify(); }
@@ -480,25 +491,30 @@ export default class Changes extends View {
         .children(this.commits.map(c=>this.button(`commit-${c.hash}`,`${this.revision===c.hash?"● ":""}${c.short} · ${c.title}`,(_e,cx)=>this.chooseRevision(c.hash,cx),t,!this.loading&&!this.sending).tooltip(`${c.author} · ${c.date}\n${c.hash}`)))
         .when(!this.commits.length,e=>e.child(div().p(6).text_color(t.dim).child("No commits yet")))))
       .when(Boolean(this.revision),e=>e.child(div().px(12).py(4).truncate().text_size(11).text_color(t.dim).tooltip(this.revision).child(this.commits.find(c=>c.hash===this.revision)?.title||this.revision)))
-      .child(v_flex().id("changes-list").flex_none().h(Math.min(280, Math.max(44, treeRows(this.files).length * 28 + 12))).overflow_y_scrollbar().p(6).border_b(1).border_color(t.border).children(treeRows(this.files).map((f) => {
-        if(f.folder) return div().h(25).flex_none().pl(8+f.depth*14).text_color(t.dim).child(`▾ ${f.name}`);
+      .child(v_flex().relative().flex_none().h(treeHeight).min_h(0).border_b(1).border_color(t.border)
+        .child(v_flex().id("changes-list").size_full().min_h(0).overflow_y_scroll().p(6)
+          .child(v_flex().id("changes-content").flex_none().children(files.map((f) => {
+        if(f.folder) return div().id(`folder-${f.path}`).h(25).flex_none().pl(8+f.depth*14).rounded(5).text_color(t.dim).cursor_pointer().hover(e=>e.bg(t.hover))
+          .tooltip(`${f.collapsed?"Expand":"Collapse"} ${f.path}`).on_click((_e,cx)=>this.toggleFolder(f.path,cx)).child(`${f.collapsed?"▸":"▾"} ${f.name}`);
         const parts = f.path.split("/"), name = parts.pop();
         return h_flex().id(`change-${f.path}`).h(28).flex_none().pl(8+f.depth*14).pr(8).gap(8).items_center().rounded(7).cursor_pointer().when(this.open === f.path, (e) => e.bg(t.selected)).hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.pick(f.path, cx))
           .child(div().w(14).text_size(11).text_color(f.status === "A" ? t.ansi2 : f.status === "D" ? t.ansi1 : f.status === "U" ? t.ansi1 : t.blocked).child(f.status))
           .child(h_flex().flex_1().min_w(0).child(div().text_color(t.dim).truncate().child("")).child(div().max_w(260).min_w(0).truncate().child(name)))
           .child(this.button(`edit-${f.path}`,"nvim",(_e,cx)=>{cx.stop_propagation();this.openEditor(f.path,cx);},t).tooltip("Open this working-tree file in the existing project editor"))
           .when(f.add > 0, (e) => e.child(div().text_size(11).text_color(t.ansi2).child(`+${f.add}`))).when(f.del > 0, (e) => e.child(div().text_size(11).text_color(t.ansi1).child(`−${f.del}`)));
-      })).when(!this.files.length, (e) => e.child(div().p(8).text_color(t.dim).child(this.error || (this.loading ? "Loading changes…" : this.root ? (this.revision?"No changed files in this commit":"No uncommitted changes") : "No folder")))))
+      })).when(!this.files.length, (e) => e.child(div().p(8).text_color(t.dim).child(this.error || (this.loading ? "Loading changes…" : this.root ? (this.revision?"No changed files in this commit":"No uncommitted changes") : "No folder"))))))
+        .child(Scrollbar.vertical("changes-list").absolute().inset_0()))
       .when(this.limited, el => el.child(div().px(12).py(4).text_size(11).text_color(t.dim).child("Showing the first 1,000 changed files")))
       .child(div().px(12).py(4).text_size(10).text_color(t.dim).child(`${this.rows.length} diff lines · drag across lines or Shift-click + to select a range`))
-      .child(v_flex().id("diff-scroll")
+      .child(v_flex().relative().flex_1().min_h(0)
+        .child(v_flex().id("diff-scroll").size_full().min_h(0).overflow_scroll()
         .on_mouse_up("left",(_e,cx)=>this.endRange(cx))
         .on_hover((hovered,cx)=>{if(!hovered)this.endRange(cx,false);})
         .on_mouse_down_out((_e,cx)=>this.endRange(cx,false))
-        .flex_1().min_h(0).overflow_y_scrollbar().overflow_x_scrollbar()
         .font_family(settings().font_family ?? "JetBrains Mono").text_size(11)
-        .child(v_flex().min_w(this.diffWidth).w_full().children(this.rows.map((row,index)=>this.diffRow(row,t,index))))
+        .child(v_flex().id("diff-content").h(this.rows.length*20).flex_none().min_w(this.diffWidth).w_full().children(this.rows.map((row,index)=>this.diffRow(row,t,index))))
         .when(!this.rows.length,e=>e.child(div().p(12).text_color(t.dim).child(this.loading?"Loading diff…":this.open?"No text diff available":"Select a file to view its changes"))))
+        .child(Scrollbar.new("diff-scroll").absolute().inset_0()))
       .child(this.reviewUI(t))
       .when(Boolean(this.note), (e) => e.child(div().px(10).pb(8).text_size(11).text_color(t.muted).child(this.note)));
   }

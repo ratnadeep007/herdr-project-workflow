@@ -50,6 +50,8 @@ Mod sources are in the repository root; installed mods are under `~/.config/herd
 
 ## Reviewing diffs
 
+Click a folder’s ▾/▸ row to collapse or expand its descendants. Nested folder states are preserved when reopening a parent and across refreshes in the same project context. Folding keeps the selected file and review drafts intact. The file list has its own vertical scrollbar; the code diff scrolls independently in both directions.
+
 The diff viewer lists the latest 40 commits on the current branch plus Working tree. Select a commit to view its changes against its first parent (root commits compare against an empty tree). This does not check out or change the repository. Select a file, then click or drag across numbered lines to select a range, type a comment, and click Add. Shift-click also extends a selection. Selected rows are highlighted. Backward drags work, and ranges crossing removed and added lines retain both old/new side references. Release the mouse to finish selecting; leaving the diff viewport ends the drag. Without a line selection, Add records a file-level comment.
 
 Comments retain their revision, filename, old/new line sides, start/end numbers, and code snippet. They are saved as drafts in the mod's local storage. You can collect comments from multiple files or commits, remove individual comments, and send the batch using Send review. Unsaved text in the input is not included until Add is pressed. A changed diff clears an unsaved line selection so its highlight cannot attach to different code.

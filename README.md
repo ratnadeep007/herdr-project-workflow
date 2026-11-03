@@ -11,7 +11,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Worktrunk worktrees:** **+ → New worktree…** creates or switches a checkout with `wt`. Enter a worktree name and optional branch override, then choose an agent from a grid with logos or **None — shell only**. Agents also get a role and optional tab name. The branch defaults to the worktree name.
 - **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
 - **Kanban:** Todo / In progress / Review / Done directly from a Markdown checklist. Each top-level task is one self-contained commit; nested subtasks stay in that card, with progress and details on hover. No separate task database.
-- **Diff reviews:** working-tree or commit changes, file tree, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
+- **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
 - **Usage pills:** Claude and Codex five-hour remaining percentages; weekly usage and reset details on hover. Optional at installation.
 - **Agent skill:** `/proj-workflow` in Claude Code or `$proj-workflow` in Codex creates or updates `spec.md` and board-compatible `tasks.md`.
