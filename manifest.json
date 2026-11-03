@@ -30,6 +30,7 @@
     "project-new-menu/mod.json",
     "project-agent-launch/main.js",
     "project-agent-launch/mod.json",
+    "project-agent-launch/session_names.py",
     "project-icon/main.js",
     "project-icon/mod.json",
     "usage-status/main.js",

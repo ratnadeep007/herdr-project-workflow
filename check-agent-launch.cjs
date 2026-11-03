@@ -1,8 +1,8 @@
 const assert=require('assert/strict'),fs=require('fs');
 let currentProps={},roles={},calls=[],closed=[];
 const source=fs.readFileSync(`${__dirname}/project-agent-launch/main.js`,'utf8').replace(/^import .*;\n/gm,'').replace('export default class AgentLaunch','class AgentLaunch');
-const env={View:class{},props:()=>currentProps,shared:()=>roles,setShared:(_key,value)=>{roles=value;},closeOverlay:id=>closed.push(id),
- exec:async(command,args)=>{calls.push({command,args});return {code:0,stdout:JSON.stringify({space:'s',tab:'tab-new',pane:'p-new',terminal:'t-new'})};}};
+const env={View:class{},appHome:()=>'/config',readTextFile:async()=> 'helper',props:()=>currentProps,shared:()=>roles,setShared:(_key,value)=>{roles=value;},closeOverlay:id=>closed.push(id),
+ exec:async(command,args)=>{calls.push({command,args});if(command==='python3'){const p=JSON.parse(args[2]);return {code:0,stdout:JSON.stringify({ok:true,native:true,argv:[...p.argv,'--test-name',p.name]})};}return {code:0,stdout:JSON.stringify({space:'s',tab:'tab-new',pane:'p-new',terminal:'t-new'})};}};
 const {AgentLaunch,agentTabName,agentLaunchArgs}=new Function('env',`const {${Object.keys(env).join(',')}}=env;${source};return {AgentLaunch,agentTabName,agentLaunchArgs};`)(env);
 assert.equal(agentTabName('PROJECT-42','Planner','Claude Code'),'PROJECT-42 Planner');
 assert.equal(agentTabName('PROJECT-42 planner','Planner','Claude Code'),'PROJECT-42 planner');
@@ -13,6 +13,8 @@ assert.equal(agentTabName('PROJECT-42 Implmentor','Implementer','Claude Code'),'
 assert.equal(agentTabName('Review API','Reviewer','Claude Code'),'Review API');
 assert.equal(agentTabName('API','Reviewer','Claude Code'),'API Reviewer');
 assert.equal(agentTabName('','Planner','Codex'),'Codex Planner');
+assert.equal(agentTabName('API','None','Codex'),'API');
+assert.equal(agentTabName('API Planner','Unassigned','Codex'),'API Planner');
 assert.equal(agentTabName('API Researcher','Researcher','Codex'),'API Researcher');
 assert.equal(agentTabName('API','QA (Security)','Codex'),'API QA (Security)');
 assert.equal(agentTabName('API QA (Security)','QA (Security)','Codex'),'API QA (Security)');
@@ -22,8 +24,11 @@ assert.deepEqual(agentLaunchArgs({key:'codex',run:['codex']}),['codex','--no-dae
  currentProps={overlay:'o',space:'s',folder:'/repo',agent:{key:'codex',name:'Codex',run:['codex']}};
  const launcher=new AgentLaunch();launcher.role='Other';launcher.custom='Researcher';launcher.name='API';
  await launcher.createAgent();
- const request=JSON.parse(calls[0].args[2]);assert.equal(request.name,'API Researcher');assert.equal(request.space,'s');assert.deepEqual(request.argv,['codex','--no-daemon']);
+ const request=JSON.parse(calls.find(c=>c.command==='herdr-app').args[2]);assert.equal(request.name,'API Researcher');assert.equal(request.space,'s');assert.deepEqual(request.argv,['codex','--no-daemon','--test-name','API Researcher']);
  assert.equal(roles['t-new'],'Researcher');assert.match(request.task,/Wait for the user's task/);
- launcher.custom='';await assert.rejects(launcher.createAgent());assert.equal(calls.length,1);
+ launcher.custom='';await assert.rejects(launcher.createAgent());assert.equal(calls.length,2);
+ launcher.role='None';launcher.name='API Planner';await launcher.createAgent();
+ const unassigned=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
+ assert.equal(unassigned.name,'API Planner');assert.match(unassigned.task,/No project role is assigned/);assert.equal(roles['t-new'],'Unassigned');
  console.log('Agent launch checks passed: names, suffix deduplication, custom roles, argv and role persistence');
 })().catch(e=>{console.error(e);process.exitCode=1;});

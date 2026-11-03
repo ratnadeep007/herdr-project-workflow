@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add an opt-in worktree team step that offers every remaining role independently, with per-role providers and tab names. Include None for an unassigned agent with no name suffix; any combination is optional. Retry partial failures without duplicating agents already started.
+- Match new native session names to tab names for supported CLIs, including Claude, Codex, and OpenCode. Report unsupported native naming instead of silently claiming success.
+
 - Add collapsible diff folders and preserve nested fold preferences. Fix file-list and code scrolling with independent scroll areas and content that retains its full height.
 
 - Add keyboard tree navigation and a visible selection to the project popup, including automatic scrolling, group expansion/collapse, and Enter to switch.

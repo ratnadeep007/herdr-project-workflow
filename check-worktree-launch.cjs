@@ -8,13 +8,14 @@ function element(){let proxy;proxy=new Proxy({}, {get:(_target,key)=>{
  return ()=>proxy;
 }});return proxy;}
 const agent={key:'codex',name:'Codex',run:['codex']};
-const env={View:class{},div:element,h_flex:element,v_flex:element,svg:element,image:element,Input:{new:element},theme:()=>({}),props:()=>properties,spaces:()=>spaceList,shared:()=>roles,setShared:(_key,value)=>{roles=value;},
+const env={View:class{},appHome:()=>'/config',readTextFile:async()=> 'helper',div:element,h_flex:element,v_flex:element,svg:element,image:element,Input:{new:element},theme:()=>({}),props:()=>properties,spaces:()=>spaceList,shared:()=>roles,setShared:(_key,value)=>{roles=value;},
  exec:async(command,args,options)=>{
   calls.push({command,args,options});
+  if(command==='python3'){const p=JSON.parse(args[2]);return {code:0,stdout:JSON.stringify({ok:true,native:true,argv:[...p.argv,'--test-name',p.name]})};}
   if(command==='herdr-app'){
    if(failAgent)return {code:1,stdout:'',stderr:'Launch failed'};
    const request=JSON.parse(args[2]);
-   if(args[1]==='space.new')spaceList.push({id:'new-space',machine:request.machine,folder:request.folder});
+   if(args[1]==='space.new')spaceList.push({id:'new-space',machine:request.machine,folder:request.folder,tabs:[{id:'new-tab'}]});
    return {code:0,stdout:JSON.stringify({space:'new-space',tab:'new-tab',terminal:'new-agent'})};
   }
   if(mode==='mock'){
@@ -41,7 +42,7 @@ assert.throws(()=>worktreeResult('{"path":"/unconfirmed"}'));
  let view=launcher('feature-auth');await view.createAgent();
  assert.equal(request().folder,'/worktree/new');assert.equal(request().machine,'remote');
  assert.equal(request().name,'feature-auth');assert.equal(request().tab,'feature-auth Researcher');
- assert.deepEqual(request().argv,['codex','--no-daemon']);assert.match(request().task,/Your project role is Researcher/);
+ assert.deepEqual(request().argv,['codex','--no-daemon','--test-name','feature-auth Researcher']);assert.match(request().task,/Your project role is Researcher/);
  assert.equal(roles['new-agent'],'Researcher');
  assert.deepEqual(switches()[0].args.slice(0,3),['switch','--create','feature-auth']);
  assert.equal(switches()[0].options.on,'remote');

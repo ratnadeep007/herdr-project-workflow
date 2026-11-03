@@ -475,7 +475,7 @@ export default class ProjectHub extends View {
           .tooltip(`${a.program?.name||"Agent"} · ${a.address} · ${status}`)
           .on_click(()=>this.focusDestination(a.space,a.tab,a.pane)).child(this.logo(a,t))
           .child(div().flex_1().min_w(0).truncate().text_color(t[status]||t.muted).child(`${a.address} · ${a.tab_name||a.program?.name||"Agent"}`)))
-        .child(this.button(`role-${a.address}`,"↻",()=>{const roles={...(shared("project.roles")||{})};roles[a.address]=ROLES[(ROLES.indexOf(this.role(a))+1)%ROLES.length];setShared("project.roles",roles);},t).tooltip("Cycle role: Planner → Implementer → Reviewer")))
+        .child(this.button(`role-${a.address}`,"↻",()=>{const roles={...(shared("project.roles")||{})};const choices=[...ROLES,"Unassigned"];roles[a.address]=choices[(choices.indexOf(this.role(a))+1)%choices.length];setShared("project.roles",roles);},t).tooltip("Cycle role: Planner → Implementer → Reviewer → Unassigned")))
       .child(div().pl(21).text_size(10).text_color(t.dim).child(status))
       .child(div().pl(21).text_size(11).truncate().text_color(assigned.list.length?t.muted:t.dim)
         .tooltip(assigned.list.map(task=>`${TITLES[task.state]}: ${task.title}`).join("\n")||assigned.text).child(assigned.text));

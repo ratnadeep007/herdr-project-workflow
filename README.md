@@ -9,7 +9,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Project sidebar:** collapsible projects and roles, agent logos, exact pane navigation, pane counts, and current assigned tasks. When the sidebar is hidden, a **Projects** button in the tab bar opens the same information in a popup. Ordinary shells remain separate. Internal subagents appear only once they have their own pane.
 - **Project identity:** stable initials/colors, emoji or custom image overrides, parent paths for duplicate names, and stack details on hover.
 - **Worktrunk worktrees:** **+ → New worktree…** creates or switches a checkout with `wt`. Enter a worktree name and optional branch override, then choose an agent from a grid with logos or **None — shell only**. Agents also get a role and optional tab name. The branch defaults to the worktree name.
-- **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
+- **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / None (unassigned) / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
 - **Kanban:** Todo / In progress / Review / Done directly from a Markdown checklist. Each top-level task is one self-contained commit; nested subtasks stay in that card, with progress and details on hover. No separate task database.
 - **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
@@ -108,16 +108,23 @@ From a Git project, choose **+ → New worktree…** in the tab bar:
 
 1. Enter a **Worktree name**. The branch defaults to this name; enter a **Branch** override if needed.
 2. Choose an agent from the three-column grid with logos. Installed agents appear first; unavailable agents are disabled and marked **Not installed**. Scroll the grid to see more supported agents.
-3. Choose **Planner**, **Implementer**, **Reviewer**, or a custom **Other** role. Optionally enter a tab name; the role suffix is added without duplication.
-4. Click **Create / switch & start**.
+3. Choose **Planner**, **Implementer**, **Reviewer**, **None** (unassigned), or a custom **Other** role. Optionally enter a tab name; assigned roles get a suffix without duplication. None keeps the name unchanged.
+4. Click **Continue**. The next step offers the remaining roles independently, including an unassigned agent. Every companion is optional: an Implementer can start alone, add a Planner, add a Reviewer, or choose any combination. No role is required.
+5. Select only the additional roles you need. Each defaults to the primary agent, with **Change agent** and an optional tab name for mixed-agent teams. Choose **Just [role]** (or **Just this agent** for an unassigned primary) to start only the original, or **Start N agents** to launch the selected team. All agents use the same worktree.
 
 For a plain terminal, choose **None — shell only**, optionally name its tab, and click **Create / switch & open shell**. Mode controls are hidden, and no agent prompt or role is assigned. Herdr opens the shell configured for that machine.
 
 For example, worktree name `auth-ui` with a blank branch creates branch `auth-ui`; a branch override of `feature/auth-ui` uses that Git branch while keeping `auth-ui` as the Herdr space name. The checkout directory follows Worktrunk's configured branch-based path template. An existing local branch is switched to using `wt switch`; a missing one uses `wt switch --create` and Worktrunk's default base.
 
-Worktrunk's `--execute` callback confirms the switched working directory before Herdr starts the chosen agent there. No shell `cd`, manual `git worktree add`, or persistent Worktrunk configuration changes are used. An existing matching Herdr space receives a new agent tab; otherwise a space is created. If agent startup fails after worktree creation, retrying the same form reuses that worktree.
+Worktrunk's `--execute` callback confirms the switched working directory before Herdr starts the chosen agent there. No shell `cd`, manual `git worktree add`, or persistent Worktrunk configuration changes are used. An existing matching Herdr space receives a new agent tab; otherwise a space is created. If startup fails partway through a team, the form lists the tabs already started. Retrying reuses those tabs and starts only the missing roles; it does not recreate the worktree.
 
 Run the action from a Git project, and ensure `wt` and Python 3 are on that machine's PATH. Worktrunk hooks keep their normal approval rules; the launcher does not use `--yes`, `--no-hooks`, or `--clobber`. If a hook needs approval, approve it with Worktrunk in a terminal, then retry. The GUI command bridge has a 30-second execution limit; for lengthy setup hooks, prepare the worktree in a terminal first, then use the same branch in the launcher.
+
+### Matching native session names
+
+The final tab name, including its role suffix, is also used as the native session name where the installed agent provides a supported interface. Claude uses its startup name option. Codex and OpenCode prepare an empty named native session and open that session in the CLI. Naming alone does not start an inference turn. Other CLIs are checked for a documented session/chat naming flag in their own help output.
+
+When an installed CLI has no supported naming interface, its Herdr tab still uses the chosen name and a notification explains that its native session must be renamed manually. Explicit resume/fork commands configured by the user keep their existing session identity. This applies to new agent tabs as well as worktree launches.
 
 ## Account data and local state
 
