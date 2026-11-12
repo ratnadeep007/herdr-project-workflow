@@ -30,5 +30,11 @@ assert.deepEqual(agentLaunchArgs({key:'codex',run:['codex']}),['codex','--no-dae
  launcher.role='None';launcher.name='API Planner';await launcher.createAgent();
  const unassigned=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
  assert.equal(unassigned.name,'API Planner');assert.match(unassigned.task,/No project role is assigned/);assert.equal(roles['t-new'],'Unassigned');
+ currentProps={overlay:'o',space:'s',folder:'/repo',agent:{key:'opencode',name:'OpenCode',run:['opencode']}};
+ const open=new AgentLaunch();open.role='Planner';open.name='API';await open.createAgent();
+ const openRequest=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
+ assert.deepEqual(openRequest.argv.slice(0,-2),['opencode','--test-name','API Planner']);
+ assert.equal(openRequest.argv.at(-2),'--prompt');assert.match(openRequest.argv.at(-1),/Your project role is Planner/);
+ assert.ok(!Object.hasOwn(openRequest,'task'));
  console.log('Agent launch checks passed: names, suffix deduplication, custom roles, argv and role persistence');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -131,7 +131,12 @@ export default class AgentLaunch extends View {
     const launchKey=JSON.stringify([on,folder,name,shellOnly?null:agent.run,role]),previous=this.createdLaunches?.[launchKey];
     if(previous&&spaces().some(space=>space.tabs?.some(tab=>tab.id===previous.tab)))return previous;
     this.phase=shellOnly?"Opening shell…":`Starting ${role}…`;cx?.notify();
-    if(!shellOnly){request.argv=await this.namedArgs(agent,name,folder,on);request.task=roleIntro(role);}
+    if(!shellOnly){
+      request.argv=await this.namedArgs(agent,name,folder,on);
+      const intro=roleIntro(role);
+      if(agent.key==="opencode"||/(?:^|\/)opencode(?:\.exe)?$/.test(request.argv[0]))request.argv=[...request.argv,"--prompt",intro];
+      else request.task=intro;
+    }
     const r=await exec("herdr-app",["do",command,JSON.stringify(request)]);
     let result;try{result=JSON.parse(r.stdout);}catch(_){result={};}
     if(r.code!==0||result.error)throw new Error(result.error||r.stderr||(shellOnly?"Could not open shell":"Could not start agent"));

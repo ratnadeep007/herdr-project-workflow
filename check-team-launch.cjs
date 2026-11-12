@@ -43,8 +43,12 @@ assert.equal(companionName('Orders QA (Security)','QA (Security)','Reviewer','Or
  assert.deepEqual(Object.values(roles),['Planner','Implementer','Reviewer']);
  for(const {request} of successes){
   const name=request.tab||request.name;
-  assert.equal(request.argv.at(-1),name,'native session name must equal tab name');
-  assert.equal(request.folder,'/repo.orders');assert.match(request.task,/Wait for the user's task/);
+  assert.equal(request.argv[request.argv.indexOf('--test-session-name')+1],name,'native session name must equal tab name');
+  assert.equal(request.folder,'/repo.orders');
+  if(request.argv[0]==='opencode'){
+   assert.equal(request.argv.at(-2),'--prompt');assert.match(request.argv.at(-1),/Your project role is Reviewer/);
+   assert.ok(!Object.hasOwn(request,'task'));
+  }else assert.match(request.task,/Wait for the user's task/);
  }
  // Confirming only the primary role never creates any companion.
  calls=[];spaceList=[];successes=[];roles={};const only=new Launcher();only.init({},cx);await drain();
