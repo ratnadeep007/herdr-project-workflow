@@ -7,6 +7,7 @@ const source = fs.readFileSync(`${__dirname}/project-hub/main.js`, 'utf8')
 const Hub = new Function('View','terminals','agents','panes','spaces','shared', `${source}; return ProjectHub;`)(
   class {}, () => core, () => reported, () => paneList, () => spaceList, () => null);
 const hub = new Hub();
+assert.equal(hub.role({address:'tester',tab_name:'API Tester',title:''}), 'Tester');
 const known = new Set(['t1']);
 assert.equal(hub.paneKind({terminal:'t1',program:{shell:true}},known), 'Agents');
 assert.equal(hub.paneKind({terminal:'t2',program:{agent:true}},known), 'Agents');

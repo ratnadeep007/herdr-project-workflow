@@ -9,7 +9,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Project sidebar:** collapsible projects and roles, agent logos, exact pane navigation, pane counts, and current assigned tasks. When the sidebar is hidden, a **Projects** button in the tab bar opens the same information in a popup. Ordinary shells remain separate. Internal subagents appear only once they have their own pane.
 - **Project identity:** stable initials/colors, emoji or custom image overrides, parent paths for duplicate names, and stack details on hover.
 - **Worktrunk worktrees:** **+ → New worktree…** creates or switches a checkout with `wt`. Enter a worktree name and optional branch override, then choose an agent from a grid with logos or **None — shell only**. Agents also get a role and optional tab name. The branch defaults to the worktree name.
-- **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / None (unassigned) / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
+- **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / Tester / None (unassigned) / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
 - **Kanban:** Todo / In progress / Review / Done directly from a Markdown checklist. Each top-level task is one self-contained commit; nested subtasks stay in that card, with progress and details on hover. No separate task database.
 - **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
@@ -108,8 +108,8 @@ From a Git project, choose **+ → New worktree…** in the tab bar:
 
 1. Enter a **Worktree name**. The branch defaults to this name; enter a **Branch** override if needed.
 2. Choose an agent from the three-column grid with logos. Installed agents appear first; unavailable agents are disabled and marked **Not installed**. Scroll the grid to see more supported agents.
-3. Choose **Planner**, **Implementer**, **Reviewer**, **None** (unassigned), or a custom **Other** role. Optionally enter a tab name; assigned roles get a suffix without duplication. None keeps the name unchanged.
-4. Click **Continue**. The next step offers the remaining roles independently, including an unassigned agent. Every companion is optional: an Implementer can start alone, add a Planner, add a Reviewer, or choose any combination. No role is required.
+3. Choose **Planner**, **Implementer**, **Reviewer**, **Tester**, **None** (unassigned), or a custom **Other** role. Optionally enter a tab name; assigned roles get a suffix without duplication. None keeps the name unchanged.
+4. Click **Continue**. The next step offers the remaining roles independently, including an unassigned agent. Every companion is optional: an Implementer can start alone, add a Planner, add a Reviewer or Tester, or choose any combination. No role is required.
 5. Select only the additional roles you need. Each defaults to the primary agent, with **Change agent** and an optional tab name for mixed-agent teams. Choose **Just [role]** (or **Just this agent** for an unassigned primary) to start only the original, or **Start N agents** to launch the selected team. All agents use the same worktree.
 
 For a plain terminal, choose **None — shell only**, optionally name its tab, and click **Create / switch & open shell**. Mode controls are hidden, and no agent prompt or role is assigned. Herdr opens the shell configured for that machine.

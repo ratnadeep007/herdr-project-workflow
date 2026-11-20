@@ -2,11 +2,11 @@ import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { theme, props, closeOverlay, exec, shared, setShared, knownAgents, spaces, readTextFile, appHome, notify } from "herdr";
 
-const LAUNCH_ROLES=["Planner","Implementer","Reviewer","None","Other"];
+const LAUNCH_ROLES=["Planner","Implementer","Reviewer","Tester","None","Other"];
 function agentTabName(name,role,agentName) {
   const title=name.trim()||agentName,mode=role.trim();
   if(["None","Unassigned"].includes(mode))return title;
-  const aliases={Planner:["planner","orchestrator"],Implementer:["implementer","implementor","implmentor"],Reviewer:["reviewer","review"]};
+  const aliases={Planner:["planner","orchestrator"],Implementer:["implementer","implementor","implmentor"],Reviewer:["reviewer","review"],Tester:["tester"]};
   const escape=text=>text.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
   const words=(aliases[mode]||[mode]).map(escape).join("|");
   const present=new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${words})(?=$|[^\\p{L}\\p{N}])`,"iu").test(title);
@@ -19,7 +19,7 @@ function agentLaunchArgs(agent) {
 }
 function roleIntro(role) {
   if(["None","Unassigned"].includes(role))return "No project role is assigned to this session. Wait for the user's task before editing project files, running project actions, or starting additional agents.";
-  const purpose={Planner:"Plan and coordinate requested work, clarify acceptance criteria, and maintain the project plan when asked.",Implementer:"Implement requested tasks against the project plan and acceptance criteria.",Reviewer:"Review requested changes and report findings and verification gaps."};
+  const purpose={Planner:"Plan and coordinate requested work, clarify acceptance criteria, and maintain the project plan when asked.",Implementer:"Implement requested tasks against the project plan and acceptance criteria.",Reviewer:"Review requested changes and report findings and verification gaps.",Tester:"Test requested changes against acceptance criteria, report failures and verification gaps, and provide reproducible results."};
   return `Your project role is ${role}. ${purpose[role]||"Work in this role when the user assigns a task."} Wait for the user's task before editing project files, running project actions, or starting additional agents.`;
 }
 const WORKTREE_CWD = 'import json,os;print(json.dumps({"herdr_worktree_cwd":os.getcwd()}))';
@@ -36,15 +36,15 @@ function worktreeResult(stdout) {
   if(!record?.herdr_worktree_cwd)throw new Error("Worktrunk did not confirm its switched directory. Inspect the worktree before retrying.");
   return record.herdr_worktree_cwd;
 }
-const TEAM_ROLES=["Planner","Implementer","Reviewer","None"];
+const TEAM_ROLES=["Planner","Implementer","Reviewer","Tester","None"];
 function canonicalRole(role) {
   const value=role.trim().toLowerCase();
   if(["none","unassigned"].includes(value))return "Unassigned";
-  return ["planner","orchestrator"].includes(value)?"Planner":["implementer","implementor","implmentor"].includes(value)?"Implementer":["reviewer","review"].includes(value)?"Reviewer":role;
+  return ["planner","orchestrator"].includes(value)?"Planner":["implementer","implementor","implmentor"].includes(value)?"Implementer":["reviewer","review"].includes(value)?"Reviewer":value==="tester"?"Tester":role;
 }
 function companionName(name,primaryRole,role,fallback) {
   if(canonicalRole(primaryRole)==="Unassigned")return agentTabName(name||fallback,role,fallback);
-  const aliases={Planner:["planner","orchestrator"],Implementer:["implementer","implementor","implmentor"],Reviewer:["reviewer","review"]};
+  const aliases={Planner:["planner","orchestrator"],Implementer:["implementer","implementor","implmentor"],Reviewer:["reviewer","review"],Tester:["tester"]};
   const escape=text=>text.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
   const pattern=(aliases[canonicalRole(primaryRole)]||[primaryRole]).map(escape).join("|");
   const base=name.trim().replace(new RegExp(`(?:^|\\s+)(?:${pattern})$`,"iu"),"").replace(new RegExp(`^(?:${pattern})(?:\\s+|$)`,"iu"),"").trim()||fallback;
@@ -66,7 +66,7 @@ export default class AgentLaunch extends View {
       this.agentsLoaded=true;cx.notify();
     });
     this.nameInput=InputState.new({placeholder:"Optional name, e.g. PROJECT-42"});
-    this.roleInput=InputState.new({placeholder:"Mode name, e.g. Tester or Researcher"});
+    this.roleInput=InputState.new({placeholder:"Mode name, e.g. Researcher"});
     this.nameInput.on("change",(_e,cx)=>{this.name=this.nameInput.value();cx.notify();});
     this.roleInput.on("change",(_e,cx)=>{this.custom=this.roleInput.value();cx.notify();});
     this.nameInput.on("submit",(_e,cx)=>this.launch(cx));

@@ -159,7 +159,7 @@ for label,files in [('Python',['pyproject.toml','requirements.txt','setup.py','P
 print(json.dumps(labels))
 `;
 
-const ROLES = ["Planner", "Implementer", "Reviewer"];
+const ROLES = ["Planner", "Implementer", "Reviewer", "Tester"];
 const STATES = ["todo", "doing", "review", "done"];
 const TITLES = {todo:"Todo", doing:"In progress", review:"Review", done:"Done"};
 function parse(text) {
@@ -195,7 +195,7 @@ export default class ProjectHub extends View {
     const explicit = roles[a.address];
     if (explicit) return explicit;
     const text = `${a.tab_name} ${a.title}`.toLowerCase();
-    return /review/.test(text)?"Reviewer":/plan|orchestrat/.test(text)?"Planner":/impl/.test(text)?"Implementer":"Unassigned";
+    return /review/.test(text)?"Reviewer":/plan|orchestrat/.test(text)?"Planner":/impl/.test(text)?"Implementer":/test/.test(text)?"Tester":"Unassigned";
   }
   foregroundAgent(k) {
     const fg=k?.foreground;
@@ -475,7 +475,7 @@ export default class ProjectHub extends View {
           .tooltip(`${a.program?.name||"Agent"} · ${a.address} · ${status}`)
           .on_click(()=>this.focusDestination(a.space,a.tab,a.pane)).child(this.logo(a,t))
           .child(div().flex_1().min_w(0).truncate().text_color(t[status]||t.muted).child(`${a.address} · ${a.tab_name||a.program?.name||"Agent"}`)))
-        .child(this.button(`role-${a.address}`,"↻",()=>{const roles={...(shared("project.roles")||{})};const choices=[...ROLES,"Unassigned"];roles[a.address]=choices[(choices.indexOf(this.role(a))+1)%choices.length];setShared("project.roles",roles);},t).tooltip("Cycle role: Planner → Implementer → Reviewer → Unassigned")))
+        .child(this.button(`role-${a.address}`,"↻",()=>{const roles={...(shared("project.roles")||{})};const choices=[...ROLES,"Unassigned"];roles[a.address]=choices[(choices.indexOf(this.role(a))+1)%choices.length];setShared("project.roles",roles);},t).tooltip("Cycle role: Planner → Implementer → Reviewer → Tester → Unassigned")))
       .child(div().pl(21).text_size(10).text_color(t.dim).child(status))
       .child(div().pl(21).text_size(11).truncate().text_color(assigned.list.length?t.muted:t.dim)
         .tooltip(assigned.list.map(task=>`${TITLES[task.state]}: ${task.title}`).join("\n")||assigned.text).child(assigned.text));

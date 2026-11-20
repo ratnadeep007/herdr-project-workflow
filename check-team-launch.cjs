@@ -31,7 +31,7 @@ assert.equal(companionName('Orders QA (Security)','QA (Security)','Reviewer','Or
  const view=new Launcher();view.init({},cx);await drain();
  view.agent=agents[0];view.role='Planner';view.worktreeName='orders';view.name='Orders Planner';
  view.launch(cx);assert.equal(view.teamSetup,true);assert.equal(calls.length,0,'asking about companions must not start worktrees or agents');
- assert.deepEqual(view.companionRoles(),['Implementer','Reviewer','None']);assert.deepEqual(view.companionPlans(),[],'additional roles are opt-in');
+ assert.deepEqual(view.companionRoles(),['Implementer','Reviewer','Tester','None']);assert.deepEqual(view.companionPlans(),[],'additional roles are opt-in');
  view.extraRoles={Implementer:true,Reviewer:true};view.extraAgents={Implementer:agents[1],Reviewer:agents[2]};view.extraNames={Reviewer:'Orders audit'};
  const plans=view.companionPlans();assert.equal(plans[0].name,'Orders Implementer');assert.equal(plans[1].name,'Orders audit Reviewer');
  failReviewer=true;await assert.rejects(view.createTeam(cx,plans),/Reviewer launch failed/);
@@ -54,12 +54,12 @@ assert.equal(companionName('Orders QA (Security)','QA (Security)','Reviewer','Or
  calls=[];spaceList=[];successes=[];roles={};const only=new Launcher();only.init({},cx);await drain();
  only.agent=agents[0];only.role='Reviewer';only.worktreeName='orders';
  only.startLaunch(cx,[]);await drain();assert.equal(successes.length,1);assert.equal(closed.at(-1),'launcher');
- assert.deepEqual(only.companionRoles(),['Planner','Implementer','None']);
- only.role='Other';only.custom='Architect';assert.deepEqual(only.companionRoles(),['Planner','Implementer','Reviewer','None']);
+ assert.deepEqual(only.companionRoles(),['Planner','Implementer','Tester','None']);
+ only.role='Other';only.custom='Architect';assert.deepEqual(only.companionRoles(),['Planner','Implementer','Reviewer','Tester','None']);
  // Every primary role permits every subset of its remaining role options, including none.
  let combinations=0;
- for(const primaryRole of ['Planner','Implementer','Reviewer','None']) {
-  const available=['Planner','Implementer','Reviewer','None'].filter(role=>role!==primaryRole);
+ for(const primaryRole of ['Planner','Implementer','Reviewer','Tester','None']) {
+  const available=['Planner','Implementer','Reviewer','Tester','None'].filter(role=>role!==primaryRole);
   for(let mask=0;mask<(1<<available.length);mask++) {
    calls=[];spaceList=[];successes=[];roles={};
    const option=new Launcher();option.init({},cx);await drain();option.agent=agents[0];option.role=primaryRole;option.worktreeName='orders';option.name='Orders';
@@ -76,6 +76,6 @@ assert.equal(companionName('Orders QA (Security)','QA (Security)','Reviewer','Or
    combinations++;
   }
  }
- assert.equal(combinations,32);
- console.log('Team launch checks passed: opt-in prompt, missing-role suggestions, 32 role combinations, explicit unassigned agents, per-role names, one worktree and retry without duplicates');
+ assert.equal(combinations,80);
+ console.log('Team launch checks passed: opt-in prompt, missing-role suggestions, 80 role combinations, explicit unassigned agents, per-role names, one worktree and retry without duplicates');
 })().catch(error=>{console.error(error);process.exitCode=1;});

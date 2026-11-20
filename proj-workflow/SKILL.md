@@ -1,6 +1,6 @@
 ---
 name: proj-workflow
-description: Create or maintain a project specification and tasks.md checklist for the Herdr project Kanban board, including agent ownership and planner, implementer, and reviewer handoffs. Use for /proj-workflow, $proj-workflow, or a request to prepare a Herdr project workflow.
+description: Create or maintain a project specification and tasks.md checklist for the Herdr project Kanban board, including agent ownership and planner, implementer, tester, and reviewer handoffs. Use for /proj-workflow, $proj-workflow, or a request to prepare a Herdr project workflow.
 ---
 
 # Project workflow
@@ -48,7 +48,7 @@ Ordinary unchecked tasks without metadata appear in Todo. The board is generated
 
 When running inside Herdr and agent coordination is relevant, read `hc --skill` and inspect `hc ls --json` before assigning owners. Never fabricate addresses or take control of unrelated terminals. Do not start or prompt other agents unless the user's request authorizes that work.
 
-Herdr's project sidebar detects roles from each agent's tab name and terminal title: `review` → Reviewer, `plan` or `orchestrat` → Planner, `impl` → Implementer. An explicit role chosen with the sidebar's ↻ button overrides that detection. Use unambiguous tab names `Planner`, `Implementer`, and `Reviewer` for newly authorized role tabs. Setting `agent` in a card assigns ownership; it does not set the agent's sidebar role, send a prompt, or start work.
+Herdr's project sidebar detects roles from each agent's tab name and terminal title: `review` → Reviewer, `plan` or `orchestrat` → Planner, `impl` → Implementer, `test` → Tester. An explicit role chosen with the sidebar's ↻ button overrides that detection. Use unambiguous tab names `Planner`, `Implementer`, `Reviewer`, and `Tester` for newly authorized role tabs. Setting `agent` in a card assigns ownership; it does not set the agent's sidebar role, send a prompt, or start work.
 
 If an agent's work actually begins, set its task to `doing` with its verified address. On handoff, set the task to `review` and assign the actual reviewer, or leave ownership unassigned when none exists. Set `done` and check the box only when all subtasks, acceptance criteria, necessary verification, and review have passed and the task is ready for its single commit. An idle or exited agent is not proof a task is complete. Keep blocked tasks in their current column and explain the blocker in a paragraph beneath the card.
 

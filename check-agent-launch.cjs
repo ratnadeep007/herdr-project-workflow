@@ -12,6 +12,7 @@ assert.equal(agentTabName('PROJECT-42 Implementor','Implementer','Claude Code'),
 assert.equal(agentTabName('PROJECT-42 Implmentor','Implementer','Claude Code'),'PROJECT-42 Implmentor');
 assert.equal(agentTabName('Review API','Reviewer','Claude Code'),'Review API');
 assert.equal(agentTabName('API','Reviewer','Claude Code'),'API Reviewer');
+assert.equal(agentTabName('API Tester','Tester','Codex'),'API Tester');
 assert.equal(agentTabName('','Planner','Codex'),'Codex Planner');
 assert.equal(agentTabName('API','None','Codex'),'API');
 assert.equal(agentTabName('API Planner','Unassigned','Codex'),'API Planner');
@@ -26,7 +27,10 @@ assert.deepEqual(agentLaunchArgs({key:'codex',run:['codex']}),['codex','--no-dae
  await launcher.createAgent();
  const request=JSON.parse(calls.find(c=>c.command==='herdr-app').args[2]);assert.equal(request.name,'API Researcher');assert.equal(request.space,'s');assert.deepEqual(request.argv,['codex','--no-daemon','--test-name','API Researcher']);
  assert.equal(roles['t-new'],'Researcher');assert.match(request.task,/Wait for the user's task/);
- launcher.custom='';await assert.rejects(launcher.createAgent());assert.equal(calls.length,2);
+ launcher.role='Tester';await launcher.createAgent();
+ const tester=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
+ assert.equal(tester.name,'API Tester');assert.equal(roles['t-new'],'Tester');assert.match(tester.task,/Test requested changes against acceptance criteria/);
+ launcher.role='Other';launcher.custom='';await assert.rejects(launcher.createAgent());assert.equal(calls.length,4);
  launcher.role='None';launcher.name='API Planner';await launcher.createAgent();
  const unassigned=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
  assert.equal(unassigned.name,'API Planner');assert.match(unassigned.task,/No project role is assigned/);assert.equal(roles['t-new'],'Unassigned');
