@@ -19,7 +19,7 @@ function agentLaunchArgs(agent) {
 }
 function roleIntro(role) {
   if(["None","Unassigned"].includes(role))return "No project role is assigned to this session. Wait for the user's task before editing project files, running project actions, or starting additional agents.";
-  const purpose={Planner:"Plan and coordinate requested work, clarify acceptance criteria, and maintain the project plan when asked.",Implementer:"Implement requested tasks against the project plan and acceptance criteria.",Reviewer:"Review requested changes and report findings and verification gaps.",Tester:"Test requested changes against acceptance criteria, report failures and verification gaps, and provide reproducible results."};
+  const purpose={Planner:"Plan and coordinate requested work, clarify acceptance criteria, and maintain the project plan when asked.",Implementer:"Implement requested tasks against the project plan and acceptance criteria.",Reviewer:"Review requested changes and report findings and verification gaps.",Tester:"Test requested changes against acceptance criteria, report failures and verification gaps, and provide reproducible results. Do not modify application code, test code, or other project files; report issues for an implementer to fix."};
   return `Your project role is ${role}. ${purpose[role]||"Work in this role when the user assigns a task."} Wait for the user's task before editing project files, running project actions, or starting additional agents.`;
 }
 const WORKTREE_CWD = 'import json,os;print(json.dumps({"herdr_worktree_cwd":os.getcwd()}))';

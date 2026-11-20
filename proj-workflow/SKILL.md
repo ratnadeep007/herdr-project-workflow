@@ -50,6 +50,8 @@ When running inside Herdr and agent coordination is relevant, read `hc --skill` 
 
 Herdr's project sidebar detects roles from each agent's tab name and terminal title: `review` → Reviewer, `plan` or `orchestrat` → Planner, `impl` → Implementer, `test` → Tester. An explicit role chosen with the sidebar's ↻ button overrides that detection. Use unambiguous tab names `Planner`, `Implementer`, `Reviewer`, and `Tester` for newly authorized role tabs. Setting `agent` in a card assigns ownership; it does not set the agent's sidebar role, send a prompt, or start work.
 
+A Tester verifies behavior and reports reproducible failures and verification gaps without modifying application code, test code, or other project files. Hand fixes to an Implementer.
+
 If an agent's work actually begins, set its task to `doing` with its verified address. On handoff, set the task to `review` and assign the actual reviewer, or leave ownership unassigned when none exists. Set `done` and check the box only when all subtasks, acceptance criteria, necessary verification, and review have passed and the task is ready for its single commit. An idle or exited agent is not proof a task is complete. Keep blocked tasks in their current column and explain the blocker in a paragraph beneath the card.
 
 Agents working on files should claim and update their own tasks as they progress. Before saving, re-read tasks.md and preserve intervening edits from the board or other agents. Make targeted edits rather than replacing a stale full-file snapshot. After a restart, verify that a stored address still refers to the intended agent before reusing it.

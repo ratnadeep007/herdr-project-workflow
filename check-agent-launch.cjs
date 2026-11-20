@@ -29,7 +29,7 @@ assert.deepEqual(agentLaunchArgs({key:'codex',run:['codex']}),['codex','--no-dae
  assert.equal(roles['t-new'],'Researcher');assert.match(request.task,/Wait for the user's task/);
  launcher.role='Tester';await launcher.createAgent();
  const tester=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
- assert.equal(tester.name,'API Tester');assert.equal(roles['t-new'],'Tester');assert.match(tester.task,/Test requested changes against acceptance criteria/);
+ assert.equal(tester.name,'API Tester');assert.equal(roles['t-new'],'Tester');assert.match(tester.task,/Test requested changes against acceptance criteria/);assert.match(tester.task,/Do not modify application code, test code, or other project files/);
  launcher.role='Other';launcher.custom='';await assert.rejects(launcher.createAgent());assert.equal(calls.length,4);
  launcher.role='None';launcher.name='API Planner';await launcher.createAgent();
  const unassigned=JSON.parse(calls.filter(c=>c.command==='herdr-app').at(-1).args[2]);
