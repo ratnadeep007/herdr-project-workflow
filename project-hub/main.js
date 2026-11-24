@@ -175,8 +175,8 @@ function parse(text) {
       current={index,raw,prefix:m[1],title:m[3].replace(/<!-- herdr:.*? -->/,"").trim(),state:m[2].toLowerCase()==="x"?"done":STATES.includes(fields.state)&&fields.state!=="done"?fields.state:"todo",agent:fields.agent||null,subtasks:[]};
       tasks.push(current);continue;
     }
-    const child=/^\s+(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/.exec(raw);
-    if(child&&current)current.subtasks.push({index,checked:child[1].toLowerCase()==="x",title:child[2].replace(/<!-- herdr:.*? -->/,"").trim()});
+    const child=/^(\s+)(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/.exec(raw);
+    if(child&&current)current.subtasks.push({index,indent:child[1].replace(/\t/g,"    ").length,checked:child[2].toLowerCase()==="x",title:child[3].replace(/<!-- herdr:.*? -->/,"").trim()});
     else if(/^\S/.test(raw))current=null;
   }
   return tasks;
@@ -288,7 +288,7 @@ export default class ProjectHub extends View {
     const original=this.text,path=this.path;this.saving=true;
     cx.spawn(async cx=>{try{await writeTextFile(path,lines.join("\n"),original);this.error=null;}catch(e){this.error=`Tasks changed elsewhere. Refresh and retry. ${e}`;}finally{this.saving=false;this.refresh(cx);cx.notify();}});
   }
-  button(id,text,action,t) {return div().id(id).px(8).py(5).rounded(6).text_size(11).text_color(t.muted).hover(e=>e.bg(t.hover)).cursor_pointer().on_click(action).child(text);}
+  button(id,text,action,t) {return div().id(id).px(8).py(5).rounded(6).text_size(11).text_color(t.muted).hover(e=>e.bg(t.hover)).cursor_pointer().on_click((e,cx)=>{cx.stop_propagation();action(e,cx);}).child(text);}
   board(cx,t) {
     const data=this.snapshot(),s=data.spaces.find(s=>s.active),all=this.allAgents(data);
     const members=s?this.members(s,data,all):[],byAddress=new Map(members.map(a=>[a.address,a]));
@@ -303,6 +303,14 @@ export default class ProjectHub extends View {
         .child(this.button("refresh","Refresh",(_e,cx)=>this.refresh(cx),t))
         .child(this.button("close","Close",()=>props().overlay?closeOverlay(props().overlay):run("tab.close",{confirmed:true}),t)))
       .when(Boolean(this.error),e=>e.child(div().p(14).text_color(t.blocked).child(this.error)))
+      .child(v_flex().flex_none().px(16).py(8).gap(4).border_b(1).border_color(t.border)
+        .child(div().text_size(11).font_semibold().child("Agent activity"))
+        .when(!members.length,e=>e.child(div().text_size(11).text_color(t.dim).child("No live agents in this project")))
+        .child(h_flex().gap(6).overflow_scroll().children(members.map(a=>{
+          const assigned=this.tasks.filter(task=>task.agent===a.address&&task.state!=="done");
+          const label=`${this.role(a,data.roles)} · ${a.status||"unknown"} · ${assigned.length?assigned.map(task=>task.title).join(", "):"No active task assigned"}`;
+          return this.button(`activity-${a.address}`,label,()=>run("agent.focus",{terminal:a.address}),t).tooltip(`Observed status · assigned tasks\n${a.address}\n${label}`);
+        }))))
       .child(h_flex().flex_1().min_h(0).items_stretch().gap(12).p(14).children(STATES.map(state=>{
         const tasks=buckets[state],page=Math.min(pages[state]||0,Math.max(0,Math.ceil(tasks.length/pageSize)-1));
         const shown=tasks.slice(page*pageSize,(page+1)*pageSize);
@@ -310,9 +318,12 @@ export default class ProjectHub extends View {
           .child(h_flex().px(12).h(38).items_center().gap(8).child(div().font_semibold().child(TITLES[state])).child(div().text_color(t.dim).child(String(tasks.length))))
           .child(v_flex().id(`column-${state}`).flex_1().min_h(0).overflow_y_scrollbar().p(8).gap(8).children(shown.map(task=>{
             const agent=byAddress.get(task.agent);
-            return v_flex().p(10).gap(8).rounded(8).border_1().border_color(t.border).bg(t.background)
+            const expanded=Boolean(this.expandedTasks?.[task.index]),minIndent=Math.min(...task.subtasks.map(sub=>sub.indent));
+            return v_flex().p(10).gap(8).rounded(8).border_1().border_color(t.border).bg(t.background).cursor_pointer()
+              .on_click((_e,cx)=>{this.expandedTasks={...(this.expandedTasks||{}),[task.index]:!expanded};cx.notify();})
               .child(div().child(task.title))
-              .when(Boolean(task.subtasks?.length),e=>e.child(div().text_size(10).text_color(t.muted).tooltip(task.subtasks.map(sub=>`${sub.checked?"☑":"☐"} ${sub.title}`).join("\n")).child(`${task.subtasks.filter(sub=>sub.checked).length}/${task.subtasks.length} subtasks · one commit`)))
+              .when(Boolean(task.subtasks?.length),e=>e.child(div().text_size(10).text_color(t.muted).child(`${expanded?"▾":"▸"} ${task.subtasks.filter(sub=>sub.checked).length}/${task.subtasks.length} subtasks`)))
+              .when(expanded,e=>e.child(v_flex().gap(4).children(task.subtasks.map(sub=>div().pl(Math.min(60,Math.max(0,sub.indent-minIndent)*5)).text_size(11).text_color(sub.checked?t.dim:t.foreground).child(`${sub.checked?"☑":"☐"} ${sub.title}`)))))
               .child(this.button(`owner-${task.index}`, agent?`${this.role(agent,data.roles)} · ${agent.address} · ${agent.status}`:task.agent?`${task.agent} · offline`:"Assign agent",(_e,cx)=>this.update(task,{agent:choices[(choices.indexOf(task.agent)+1)%choices.length]},cx),t).tooltip("Click to cycle through this project's agents; assignment does not send a prompt"))
               .when(Boolean(agent),e=>e.child(this.button(`focus-${task.index}`,"Go to agent",()=>run("agent.focus",{terminal:agent.address}),t)))
               .child(h_flex().gap(4).children(STATES.filter(v=>v!==state).map(v=>this.button(`state-${task.index}-${v}`,TITLES[v],(_e,cx)=>this.update(task,{state:v},cx),t))));
