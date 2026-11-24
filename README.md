@@ -14,7 +14,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
 - **Usage pills:** Claude and Codex five-hour remaining percentages; weekly usage and reset details on hover. Optional at installation.
-- **Agent alerts:** Better Alerts posts desktop notifications when an agent needs attention or finishes while you are elsewhere. It reads the agent's terminal screen to include a short excerpt.
+- **Agent alerts:** [Better Alerts by munza](https://github.com/munza/herdr-mods/tree/main/better-alerts) inspired this integration and supplies its mod and macOS notifier source. It posts desktop notifications when an agent needs attention or finishes while you are elsewhere, reading the agent's terminal screen to include a short excerpt.
 - **Agent skill:** `/proj-workflow` in Claude Code or `$proj-workflow` in Codex creates or updates `spec.md` and board-compatible `tasks.md`.
 
 ## Requirements
