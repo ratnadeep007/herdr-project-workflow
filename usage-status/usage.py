@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 
@@ -73,18 +74,34 @@ def codex():
 
 
 def claude():
-    path = Path.home() / ".claude/.credentials.json"
+    config = Path(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude")).expanduser()
+    path = config / ".credentials.json"
     if path.exists():
-        credentials = json.loads(path.read_text())
+        try:
+            credentials = json.loads(path.read_text())
+        except (OSError, ValueError):
+            return {"error": "Claude credentials file cannot be read"}
     else:
-        raw = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", "Claude Code-credentials", "-w"], capture_output=True, text=True, timeout=10, check=True).stdout
-        credentials = json.loads(raw)
+        if config != Path.home() / ".claude":
+            return {"error": "Claude credentials file missing for CLAUDE_CONFIG_DIR"}
+        try:
+            raw = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", "Claude Code-credentials", "-w"], capture_output=True, text=True, timeout=10, check=True).stdout
+            credentials = json.loads(raw)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return {"error": "Claude Keychain login unavailable; check sign-in and Keychain access"}
     token = credentials.get("claudeAiOauth", {}).get("accessToken")
     if not token:
         return {"error": "Claude subscription login unavailable"}
     req = urllib.request.Request("https://api.anthropic.com/api/oauth/usage", headers={"Authorization": "Bearer " + token, "anthropic-beta": "oauth-2025-04-20", "User-Agent": "herdr-usage-pill/1.0"})
-    with urllib.request.urlopen(req, timeout=15) as response:
-        data = json.load(response)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            data = json.load(response)
+    except urllib.error.HTTPError as error:
+        if error.code in (401, 403):
+            return {"error": "Claude login expired or cannot access usage; sign in again"}
+        return {"error": f"Claude usage service returned HTTP {error.code}"}
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return {"error": "Claude usage service unavailable; check network"}
     from datetime import datetime
     def window(key):
         value = data.get(key)
