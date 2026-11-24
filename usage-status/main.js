@@ -15,11 +15,14 @@ export default class UsageStatus extends View {
     cx.timer.every(300000, cx => this.refresh(cx));
   }
   refresh(cx) {
+    if (this.loading) return;
+    this.loading = true;
     cx.spawn(async cx => {
       try {
-        const r = await exec("python3", [`${appHome()}/mods/usage-status/usage.py`]);
+        const r = await exec("python3", [`${appHome()}/mods/usage-status/usage.py`], { timeout: 90000 });
         this.usage = JSON.parse(r.stdout);
       } catch (_) { this.usage = { codex: {error: "Usage unavailable"}, claude: {error: "Usage unavailable"} }; }
+      this.loading = false;
       cx.notify();
     });
   }

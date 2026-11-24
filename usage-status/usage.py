@@ -3,8 +3,9 @@
 import json
 import os
 import shutil
-import selectors
+import queue
 import subprocess
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -12,6 +13,17 @@ from pathlib import Path
 
 def codex():
     binary = shutil.which("codex")
+    if not binary:
+        try:
+            shell = os.environ.get("SHELL", "/bin/sh")
+            result = subprocess.run([shell, "-lic", 'printf "\\nHERDR_PATH=%s\\n" "$PATH"'], capture_output=True, text=True, timeout=8)
+            paths = [line.removeprefix("HERDR_PATH=") for line in result.stdout.splitlines() if line.startswith("HERDR_PATH=")]
+            if paths:
+                binary = shutil.which("codex", path=paths[-1])
+                if binary:
+                    os.environ["PATH"] = paths[-1]
+        except (OSError, subprocess.SubprocessError):
+            pass
     if not binary:
         return {"error": "Codex CLI is not on PATH"}
     env = os.environ.copy()
@@ -21,14 +33,19 @@ def codex():
         def send(message):
             p.stdin.write(json.dumps(message) + "\n")
             p.stdin.flush()
-        selector = selectors.DefaultSelector()
-        selector.register(p.stdout, selectors.EVENT_READ)
+        messages = queue.Queue()
+        def read_lines():
+            for line in p.stdout:
+                messages.put(line)
+            messages.put(None)
+        threading.Thread(target=read_lines, daemon=True).start()
         def receive(request_id):
             deadline = time.monotonic() + 20
             while time.monotonic() < deadline:
-                if not selector.select(deadline - time.monotonic()):
+                try:
+                    line = messages.get(timeout=max(0, deadline - time.monotonic()))
+                except queue.Empty:
                     break
-                line = p.stdout.readline()
                 if not line:
                     break
                 message = json.loads(line)
