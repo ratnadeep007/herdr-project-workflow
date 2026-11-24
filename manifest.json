@@ -13,7 +13,8 @@
     "project-new-menu",
     "project-agent-launch",
     "project-icon",
-    "usage-status"
+    "usage-status",
+    "better-alerts"
   ],
   "files": [
     "project-hub/main.js",
@@ -36,6 +37,14 @@
     "usage-status/main.js",
     "usage-status/mod.json",
     "usage-status/usage.py",
-    "layouts/project-workflow.json"
+    "layouts/project-workflow.json",
+    "better-alerts/main.js",
+    "better-alerts/mod.json",
+    "better-alerts/mod.schema.json",
+    "better-alerts/settings.js",
+    "better-alerts/words.js",
+    "better-alerts-helper/main.swift",
+    "better-alerts-helper/Info.plist",
+    "better-alerts-helper/build.sh"
   ]
 }

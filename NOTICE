@@ -11,3 +11,6 @@ Herdr and the agent product names belong to their respective owners.
 This is an independent community customization, not an official Herdr release.
 Herdr's executable, fonts, program logos and other runtime assets are not
 redistributed here; they are supplied by the user's Herdr installation.
+
+Better Alerts and its macOS notifier are adapted from munza/herdr-mods,
+distributed under the Apache License, Version 2.0.

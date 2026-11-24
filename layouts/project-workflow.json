@@ -164,5 +164,15 @@
   "traffic_lights": [
     12,
     16
+  ],
+  "floating": [
+    {
+      "id": "better-alerts",
+      "content": {
+        "mod": "better-alerts"
+      },
+      "edge": "bottom",
+      "align": "end"
+    }
   ]
 }

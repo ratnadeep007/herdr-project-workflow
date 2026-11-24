@@ -14,6 +14,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
 - **Usage pills:** Claude and Codex five-hour remaining percentages; weekly usage and reset details on hover. Optional at installation.
+- **Agent alerts:** Better Alerts posts desktop notifications when an agent needs attention or finishes while you are elsewhere. It reads the agent's terminal screen to include a short excerpt.
 - **Agent skill:** `/proj-workflow` in Claude Code or `$proj-workflow` in Codex creates or updates `spec.md` and board-compatible `tasks.md`.
 
 ## Requirements
@@ -38,6 +39,14 @@ Herdr should be running for `--activate`. Without that flag, installation does n
 ```sh
 herdr-app do layout.switch '{"name":"project-workflow"}'
 ```
+
+On macOS, build the optional notification helper once for clickable alerts (requires Xcode Command Line Tools):
+
+```sh
+sh ~/.config/herdr-app/better-alerts-helper/build.sh
+```
+
+Without the helper, macOS alerts use Script Editor and cannot focus the agent when clicked. Linux alerts require `notify-send`. The mod's `alerts.blocked` and `alerts.done` settings in `mods/better-alerts/mod.json` control the two alert types.
 
 Skill installation is opt-in: `--skills codex`, `claude`, or `both`; the default installs neither. Existing files at the same skill path are backed up. Restart your agent or open a fresh session to discover a newly installed skill.
 
