@@ -14,3 +14,6 @@ redistributed here; they are supplied by the user's Herdr installation.
 
 Better Alerts and its macOS notifier are adapted from munza/herdr-mods,
 distributed under the Apache License, Version 2.0.
+Better Icons and its icon lookup code are from munza/herdr-mods (Apache-2.0).
+Its Material Icon Theme assets are MIT licensed; their license is included
+in better-icons/LICENSE-material-icon-theme.txt.

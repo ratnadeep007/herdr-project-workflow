@@ -3,6 +3,7 @@
 import { View, div, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, props, agents, shared, hc, setShared, run, notify } from "herdr";
+import { followFileIcons, fileIcon, isLight } from "./file-icons.js";
 
 // PROJECT_IDENTITY_BEGIN
 // Stable identity shared by project surfaces. No top-level state or I/O.
@@ -187,6 +188,7 @@ function treeRows(files, collapsed=new Set()) {
 }
 export default class Changes extends View {
   init(_props, cx) {
+    followFileIcons(this,cx);
     this.collapsedFolders=new Set();
     this.files = []; this.rows = []; this.diffWidth = 0; this.message = ""; this.showCommits=true; this.commits=[]; this.revision=null; this.comments=[]; this.recipients=[]; this.anchor=null; this.selectedAgent=null; this.handle = cx.focus_handle();
     this.input = InputState.new({ placeholder: "Write a review comment…" });
@@ -514,11 +516,13 @@ export default class Changes extends View {
       .child(v_flex().relative().flex_none().h(treeHeight).min_h(0).border_b(1).border_color(t.border)
         .child(v_flex().id("changes-list").size_full().min_h(0).overflow_y_scroll().p(6)
           .child(v_flex().id("changes-content").flex_none().children(files.map((f) => {
-        if(f.folder) return div().id(`folder-${f.path}`).h(25).flex_none().pl(8+f.depth*14).rounded(5).text_color(t.dim).cursor_pointer().hover(e=>e.bg(t.hover))
-          .tooltip(`${f.collapsed?"Expand":"Collapse"} ${f.path}`).on_click((_e,cx)=>this.toggleFolder(f.path,cx)).child(`${f.collapsed?"▸":"▾"} ${f.name}`);
+        if(f.folder) {const icon=fileIcon(this.fileIcons,`${this.root}/${f.path}`,{dir:true,open:!f.collapsed,light:isLight(t.background)});return h_flex().id(`folder-${f.path}`).h(25).flex_none().pl(8+f.depth*14).gap(5).items_center().rounded(5).text_color(t.dim).cursor_pointer().hover(e=>e.bg(t.hover))
+          .tooltip(`${f.collapsed?"Expand":"Collapse"} ${f.path}`).on_click((_e,cx)=>this.toggleFolder(f.path,cx)).child(f.collapsed?"▸":"▾").when(Boolean(icon),e=>e.child(image(icon).size(15).flex_none())).child(f.name);}
         const parts = f.path.split("/"), name = parts.pop();
+        const icon=fileIcon(this.fileIcons,`${this.root}/${f.path}`,{light:isLight(t.background)});
         return h_flex().id(`change-${f.path}`).h(28).flex_none().pl(8+f.depth*14).pr(8).gap(8).items_center().rounded(7).cursor_pointer().when(this.open === f.path, (e) => e.bg(t.selected)).hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.pick(f.path, cx))
           .child(div().w(14).text_size(11).text_color(f.status === "A" ? t.ansi2 : f.status === "D" ? t.ansi1 : f.status === "U" ? t.ansi1 : t.blocked).child(f.status))
+          .when(Boolean(icon),e=>e.child(image(icon).size(15).flex_none()))
           .child(h_flex().flex_1().min_w(0).child(div().text_color(t.dim).truncate().child("")).child(div().max_w(260).min_w(0).truncate().child(name)))
           .child(this.button(`edit-${f.path}`,"nvim",(_e,cx)=>{cx.stop_propagation();this.openEditor(f.path,cx);},t).tooltip("Open this working-tree file in the existing project editor"))
           .when(f.add > 0, (e) => e.child(div().text_size(11).text_color(t.ansi2).child(`+${f.add}`))).when(f.del > 0, (e) => e.child(div().text_size(11).text_color(t.ansi1).child(`−${f.del}`)));
