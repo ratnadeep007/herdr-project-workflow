@@ -3,6 +3,7 @@ import json
 import os
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -89,6 +90,19 @@ def codex_session(binary, name, cwd):
 def prepare(agent, argv, name, cwd):
     backend = agent.get("key", "")
     binary = argv[0]
+    if not shutil.which(binary) and not os.path.dirname(binary):
+        shell = os.environ.get("SHELL", "/bin/sh")
+        try:
+            result = subprocess.run([shell, "-lic", 'printf "\\nHERDR_PATH=%s\\n" "$PATH"'],
+                                    capture_output=True, text=True, timeout=10)
+            paths = [line.removeprefix("HERDR_PATH=") for line in result.stdout.splitlines()
+                     if line.startswith("HERDR_PATH=")]
+            if paths and shutil.which(binary, path=paths[-1]):
+                os.environ["PATH"] = paths[-1]
+                argv = [shutil.which(binary), *argv[1:]]
+                binary = argv[0]
+        except (OSError, subprocess.SubprocessError):
+            pass
     program = os.path.basename(binary).removesuffix(".exe")
     if backend == "codex" or program == "codex":
         if any(argument in ("resume", "fork", "exec", "review") for argument in argv[1:]):
