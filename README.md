@@ -11,7 +11,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 - **Worktrunk worktrees:** **+ → New worktree…** creates or switches a checkout with `wt`. Enter a worktree name and optional branch override, then choose an agent from a grid with logos or **None — shell only**. Agents also get a role and optional tab name. The branch defaults to the worktree name.
 - **Agent launcher:** choose an installed agent, Planner / Implementer / Reviewer / Tester / None (unassigned) / custom role, and a name. Role suffixes are added without duplication. Starting an agent explicitly opens a new tab and gives it role instructions to await your task.
 - **Kanban:** Todo / In progress / Review / Done directly from a Markdown checklist. Each top-level task is one self-contained commit; nested subtasks stay in that card, with progress and details on hover. No separate task database.
-- **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, saved review comments, and explicit delivery to a planner or selected agent.
+- **Diff reviews:** working-tree or commit changes, a collapsible file tree, independent file-list and diff scrolling, drag-to-select line ranges, inline review comments, and explicit delivery to a planner or selected agent. Double-click a working-tree line to open it in the reusable editor. Inline comments are inspired by [herdr-gitview](https://github.com/ChmaraX/herdr-gitview).
 - **Reusable tabs:** repeated Diff clicks focus the existing tab. Open files in one managed Neovim editor, preserving unsaved buffers.
 - **Usage pills:** Claude and Codex five-hour remaining percentages; weekly usage and reset details on hover. Optional at installation.
 - **Agent alerts:** [Better Alerts by munza](https://github.com/munza/herdr-mods/tree/main/better-alerts) inspired this integration and supplies its mod and macOS notifier source. It posts desktop notifications when an agent needs attention or finishes while you are elsewhere, reading the agent's terminal screen to include a short excerpt.
@@ -22,6 +22,7 @@ Independent community customization. Tested with **Herdr GUI 0.1.11 and herdr-co
 Install Herdr GUI and herdr-core first. Ensure `herdr-app`, `hc`, `git`, and `python3` are on the GUI's shell PATH. Install [Worktrunk](https://worktrunk.dev/) (`wt`, tested with v0.77.0) to use the worktree launcher. Install `nvim` to use Editor; install and sign in to whichever agents you want to launch. Node.js 22+ is needed only for development tests.
 
 The package uses Herdr's existing built-in mods and icons, and does not include the Herdr application or agent binaries.
+
 
 ## Install
 

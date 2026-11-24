@@ -430,19 +430,19 @@ export default class Changes extends View {
     return div().id(id).px(9).py(5).rounded(6).text_size(11).text_color(enabled?t.foreground:t.dim)
       .when(enabled,e=>e.cursor_pointer().hover(s=>s.bg(t.hover)).on_click(action)).child(text);
   }
-  openEditor(file,cx) {
+  openEditor(file,cx,selectedLine=null) {
     if(!this.root)return;
     const space=spaces().find(s=>s.active);
-    const line=file===this.open?(this.anchor?.endSide==="new"?this.anchor.endLine:this.anchor?.side==="new"?this.anchor.line:null):null;
+    const line=selectedLine??(file===this.open?(this.anchor?.endSide==="new"?this.anchor.endLine:this.anchor?.side==="new"?this.anchor.line:null):null);
     cx.spawn(async cx=>{await workflowEditor({space:space?.id,root:this.root,on:this.on,file:`${this.root}/${file}`,line});cx.notify();});
   }
   reviewUI(t) {
     const selected=this.recipients.find(a=>a.address===this.selectedAgent);
     return v_flex().flex_none().border_t(1).border_color(t.border).p(10).gap(5)
       .child(div().text_size(11).text_color(t.dim).truncate().child(this.anchor?this.commentLocation({file:this.open,...this.anchor}):this.open?`${this.open} · drag across lines to select a range (or Shift-click)`:"Select a file to comment"))
-      .child(h_flex().gap(6).items_center()
+      .when(!this.anchor,e=>e.child(h_flex().gap(6).items_center()
         .child(Input.new(this.input).flex_1().h(32).px(8).rounded(6).border_1().border_color(t.input).bg(t.background).text_size(12))
-        .child(this.button("add-review-comment","Add",(_e,cx)=>this.addComment(cx),t,Boolean(this.message.trim()&&this.open&&!this.loading&&!this.sending))))
+        .child(this.button("add-review-comment","Add",(_e,cx)=>this.addComment(cx),t,Boolean(this.message.trim()&&this.open&&!this.loading&&!this.sending)))))
       .when(this.comments.length>0,e=>e.child(v_flex().id("review-comments").max_h(130).overflow_y_scrollbar().gap(4).children(this.comments.map(c=>h_flex().gap(5).items_center()
         .child(div().flex_1().min_w(0).truncate().text_size(11).tooltip(`${c.revision} · ${this.commentLocation(c)}\n${c.message}`).child(`${this.commentLocation(c)} · ${c.message}`))
         .child(this.button(`remove-${c.id}`,"×",(_e,cx)=>{if(this.sending)return;this.comments=this.comments.filter(x=>x.id!==c.id);this.saveDrafts();cx.notify();},t,!this.sending))))))
@@ -456,11 +456,30 @@ export default class Changes extends View {
         .when(!this.recipients.length,e=>e.child(div().text_size(11).text_color(t.dim).child("No agents in this project. Start one, then refresh.")))));
   }
 
+  inlineRows(t) {
+    const nodes=[],revision=this.revision||"working tree";
+    this.rows.forEach((row,index)=>{
+      nodes.push(this.diffRow(row,t,index));
+      const side=row.kind==="-"?"old":"new";
+      const comments=this.comments.filter(c=>c.file===this.open&&c.revision===revision&&c.line&&
+        (c.endLine??c.line)===row.number&&(c.endSide??c.side)===side&&
+        c.snippet&&this.rows.slice(Math.max(0,index-c.snippet.split("\n").length+1),index+1).map(r=>`${r.kind}${r.text}`).join("\n")===c.snippet);
+      for(const c of comments)nodes.push(h_flex().id(`inline-comment-${c.id}`).flex_none().mx(12).my(3).p(8).gap(8).rounded(6).bg(t.raised)
+        .child(div().flex_1().min_w(0).text_size(11).child(c.message))
+        .child(this.button(`inline-remove-${c.id}`,"×",(_e,cx)=>{if(this.sending)return;this.comments=this.comments.filter(x=>x.id!==c.id);this.saveDrafts();cx.notify();},t,!this.sending)));
+      if(this.anchor&&!this.dragging&&this.selectionRange?.end===index)nodes.push(h_flex().id("inline-comment-editor").flex_none().mx(12).my(4).gap(6).items_center()
+        .child(Input.new(this.input).flex_1().h(32).px(8).rounded(6).border_1().border_color(t.input).bg(t.background).text_size(12))
+        .child(this.button("inline-add-comment","Add",(_e,cx)=>this.addComment(cx),t,Boolean(this.message.trim()&&!this.loading&&!this.sending)))
+        .child(this.button("inline-cancel-comment","Cancel",(_e,cx)=>{this.anchor=null;this.selectionRange=null;cx.notify();},t,!this.sending)));
+    });
+    return nodes;
+  }
+
   diffRow({ kind, number, text }, t, index) {
     if (kind === "@") return div().w_full().px(12).h(20).flex_none().truncate().bg(t.raised).text_color(t.dim).child(text);
     return h_flex().id(`diff-line-${kind}-${number}`).w_full().h(20).flex_none().gap(10).cursor_pointer()
-      .tooltip("Drag across lines to select a range; Shift-click also extends the range")
-      .on_mouse_down("left",(e,cx)=>{this.beginRange(index,Boolean(e.modifiers?.shift),cx);cx.stop_propagation();})
+      .tooltip("Drag to select; Shift-click extends selection; double-click a working-tree line to open it in nvim")
+      .on_mouse_down("left",(e,cx)=>{if(e.click_count===2&&!this.revision&&number!==undefined&&kind!=="-"){this.dragging=false;this.openEditor(this.open,cx,number);}else this.beginRange(index,Boolean(e.modifiers?.shift),cx);cx.stop_propagation();})
       .on_mouse_move((_e,cx)=>this.extendRange(index,cx)).when(kind === "+", (e) => e.bg(t.ansi2 + "18")).when(kind === "-", (e) => e.bg(t.ansi1 + "18"))
       .when(Boolean(this.anchor&&this.selectionRange&&index>=this.selectionRange.start&&index<=this.selectionRange.end),e=>e.bg(t.selected))
       .child(div().id(`comment-line-${kind}-${number}`).w(20).flex_none().text_center().text_color(t.accent)
@@ -476,7 +495,8 @@ export default class Changes extends View {
     const files=treeRows(this.files,this.collapsedFolders),treeHeight=Math.min(280,Math.max(44,files.reduce((height,row)=>height+(row.folder?25:28),12)));
     return v_flex().id("changes").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13).track_focus(this.handle)
       .on_key_down((e, cx) => {
-        if (e.key === "escape" && this.typing) { this.typing = false; this.handle.focus(); cx.stop_propagation(); cx.notify(); }
+        if (e.key === "escape" && this.anchor) { this.anchor=null; this.selectionRange=null; this.selectionStart=undefined; this.dragging=false; this.typing=false; this.handle.focus(); cx.stop_propagation(); cx.notify(); }
+        else if (e.key === "escape" && this.typing) { this.typing = false; this.handle.focus(); cx.stop_propagation(); cx.notify(); }
       })
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .when(Boolean(this.root),e=>e.child(projectBadge(projectIdentity(this.root,props()?.on),20)))
@@ -512,7 +532,7 @@ export default class Changes extends View {
         .on_hover((hovered,cx)=>{if(!hovered)this.endRange(cx,false);})
         .on_mouse_down_out((_e,cx)=>this.endRange(cx,false))
         .font_family(settings().font_family ?? "JetBrains Mono").text_size(11)
-        .child(v_flex().id("diff-content").h(this.rows.length*20).flex_none().min_w(this.diffWidth).w_full().children(this.rows.map((row,index)=>this.diffRow(row,t,index))))
+        .child(v_flex().id("diff-content").flex_none().min_w(this.diffWidth).w_full().children(this.inlineRows(t)))
         .when(!this.rows.length,e=>e.child(div().p(12).text_color(t.dim).child(this.loading?"Loading diff…":this.open?"No text diff available":"Select a file to view its changes"))))
         .child(Scrollbar.new("diff-scroll").absolute().inset_0()))
       .child(this.reviewUI(t))
