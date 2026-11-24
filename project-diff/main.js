@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Modified from Herdr 0.1.11: project workflow navigation and tools.
 import { View, div, image } from "gpui-kit";
-import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
+import { v_flex, h_flex, InputState, Input, Scrollbar, Editor, EditorState } from "gpui-base";
 import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, props, agents, shared, hc, setShared, run, notify } from "herdr";
 import { followFileIcons, fileIcon, isLight } from "./file-icons.js";
 
@@ -158,6 +158,10 @@ const key = () => JSON.stringify(location());
 // the folder watch would see it, and every refresh would start the next one.
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
 const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
+function editorLanguage(path) {
+  const ext=String(path||"").split(".").pop().toLowerCase();
+  return ({js:"javascript",mjs:"javascript",cjs:"javascript",jsx:"javascript",ts:"typescript",tsx:"tsx",py:"python",rs:"rust",md:"markdown",yml:"yaml",sh:"bash",zsh:"bash",c:"c",h:"c",cc:"cpp",cpp:"cpp",hpp:"cpp",go:"go",json:"json",html:"html",css:"css",toml:"toml",yaml:"yaml",java:"java",lua:"lua",swift:"swift"})[ext]||"text";
+}
 
 // Numbers each diff line once, so a frame only draws the rows on screen.
 function diffRows(lines) {
@@ -222,7 +226,7 @@ export default class Changes extends View {
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
       try {const saved=JSON.parse(localStorage.getItem("diff.folders:"+context)||"[]");this.collapsedFolders=new Set(Array.isArray(saved)?saved.filter(path=>typeof path==="string"):[]);}catch(_){this.collapsedFolders=new Set();}
-      this.context = context; this.root = null; this.files = []; this.open = null; this.revision=props()?.revision||null; this.commits=[]; this.anchor=null; this.comments=[]; this.draftId=null; this.selectedAgent=null;
+      this.context = context; this.root = null; this.files = []; this.open = null; this.showSource=false;this.sourceEditor=null;this.revision=props()?.revision||null; this.commits=[]; this.anchor=null; this.comments=[]; this.draftId=null; this.selectedAgent=null;
       this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null; this.watched = null; this.closed = false; this.limited = false;
     }
     if (!cwd) return;
@@ -282,7 +286,7 @@ export default class Changes extends View {
         this.root = root; this.on = on; this.hasHead = head.code === 0; this.files = files; this.limited = entries.length > 1000; this.error = null;
         this.commits=commits;this.parent=null;this.readDrafts();await this.findRecipients(context);
         this.watch(root, cx);
-        if (this.open && !files.some((f) => f.path === this.open)) { this.open = null; this.setLines([]); }
+        if (this.open && !files.some((f) => f.path === this.open)) { this.open = null; this.showSource=false;this.sourceEditor=null;this.setLines([]); }
         // The first file's diff shows until you pick another.
         if (!this.open && !this.closed && files.length) this.open = files[0].path;
         if (this.open) {
@@ -317,6 +321,23 @@ export default class Changes extends View {
     if (key() === context && this.open === path && this.revision===revision) this.setLines(lines.slice(0, 1500).map(line => line.length > 4000 ? line.slice(0, 4000) + "… (line truncated)" : line));
   }
 
+  previewSource(cx) {
+    const file=this.open,root=this.root,on=this.on,context=this.context;
+    if(!file||!root)return;
+    this.sourceEditor=null;this.sourceError=null;this.sourceLoading=true;cx.notify();
+    cx.spawn(async cx=>{
+      try {
+        const value=await readTextFile(`${root}/${file}`,{on});
+        if(value===null||value.includes("\0"))throw new Error("File is missing, binary, or unreadable.");
+        if(value.length>400000)throw new Error("File is too large to preview.");
+        if(this.context!==context||this.open!==file||!this.showSource)return;
+        const t=theme();
+        this.sourceEditor=EditorState.new({language:editorLanguage(file),value,readonly:true,line_numbers:true,folding:true,font_family:settings().font_family,syntax:{keyword:t.ansi5,string:t.ansi2,comment:t.dim,function:t.ansi4,type:t.ansi3,number:t.ansi6}});
+      } catch(error) {if(this.context===context&&this.open===file&&this.showSource)this.sourceError=String(error);}
+      finally {if(this.context===context&&this.open===file){this.sourceLoading=false;cx.notify();}}
+    });
+  }
+
   setLines(lines) {
     const next=diffRows(lines);
     if(this.anchor && JSON.stringify(next)!==JSON.stringify(this.rows)) {
@@ -342,6 +363,7 @@ export default class Changes extends View {
       catch (e) { if (key() === context && this.open === path) this.note = `Cannot preview this diff (too large or unreadable): ${e}`; }
       cx.notify();
     });
+    if(this.open&&this.showSource)this.previewSource(cx);
     cx.notify();
   }
 
@@ -355,7 +377,7 @@ export default class Changes extends View {
   saveDrafts(){localStorage.setItem(this.draftKey(),JSON.stringify(this.comments));}
   chooseRevision(hash,cx) {
     if(this.loading||this.sending)return;
-    this.revision=hash;this.open=null;this.anchor=null;this.closed=false;this.setLines([]);this.refresh(cx);cx.notify();
+    this.revision=hash;this.showSource=false;this.sourceEditor=null;this.open=null;this.anchor=null;this.closed=false;this.setLines([]);this.refresh(cx);cx.notify();
   }
   async findRecipients(context) {
     const root=this.root,on=this.on;
@@ -507,6 +529,7 @@ export default class Changes extends View {
         .child(div().px(5).py(1).rounded(4).border_1().border_color(t.border).text_size(10).text_color(t.muted).child(`${this.files.length} files`))
         .child(this.button("refresh-review","Refresh",(_e,cx)=>this.refresh(cx),t,!this.loading&&!this.sending))
         .child(this.button("open-nvim","Open in nvim",(_e,cx)=>this.openEditor(this.open,cx),t,Boolean(this.open&&this.root&&!this.loading)).tooltip("Open the working-tree file in this project's reusable Editor tab"))
+        .child(this.button("toggle-source",this.showSource?"Show diff":"Code preview",(_e,cx)=>{this.showSource=!this.showSource;if(this.showSource)this.previewSource(cx);cx.notify();},t,Boolean(this.open&&this.root&&!this.loading)).tooltip("Preview the current working-tree file with syntax highlighting"))
         .child(div().flex_1()).child(div().text_size(11).text_color(t.ansi2).child(`+${add}`)).child(div().text_size(11).text_color(t.ansi1).child(`−${del}`)))
       .when(Boolean(this.showCommits),e=>e.child(v_flex().id("commit-list").h(160).flex_none().overflow_y_scrollbar().p(6)
         .child(this.button("working-tree","Working tree (uncommitted)",(_e,cx)=>this.chooseRevision(null,cx),t,!this.loading&&!this.sending))
@@ -530,7 +553,11 @@ export default class Changes extends View {
         .child(Scrollbar.vertical("changes-list").absolute().inset_0()))
       .when(this.limited, el => el.child(div().px(12).py(4).text_size(11).text_color(t.dim).child("Showing the first 1,000 changed files")))
       .child(div().px(12).py(4).text_size(10).text_color(t.dim).child(`${this.rows.length} diff lines · drag across lines or Shift-click + to select a range`))
-      .child(v_flex().relative().flex_1().min_h(0)
+      .when(Boolean(this.showSource),e=>e.child(v_flex().flex_1().min_h(0).gap(4)
+        .child(div().px(12).text_size(10).text_color(t.dim).child("Working-tree source · reopen preview to refresh · select lines and comment in diff view"))
+        .when(Boolean(this.sourceEditor),e=>e.child(Editor.new(this.sourceEditor).flex_1().min_h(0)))
+        .when(!this.sourceEditor,e=>e.child(div().p(12).text_color(t.dim).child(this.sourceLoading?"Loading source…":this.sourceError||"Select a file")))))
+      .when(!this.showSource,e=>e.child(v_flex().relative().flex_1().min_h(0)
         .child(v_flex().id("diff-scroll").size_full().min_h(0).overflow_scroll()
         .on_mouse_up("left",(_e,cx)=>this.endRange(cx))
         .on_hover((hovered,cx)=>{if(!hovered)this.endRange(cx,false);})
@@ -538,7 +565,7 @@ export default class Changes extends View {
         .font_family(settings().font_family ?? "JetBrains Mono").text_size(11)
         .child(v_flex().id("diff-content").flex_none().min_w(this.diffWidth).w_full().children(this.inlineRows(t)))
         .when(!this.rows.length,e=>e.child(div().p(12).text_color(t.dim).child(this.loading?"Loading diff…":this.open?"No text diff available":"Select a file to view its changes"))))
-        .child(Scrollbar.new("diff-scroll").absolute().inset_0()))
+        .child(Scrollbar.new("diff-scroll").absolute().inset_0())))
       .child(this.reviewUI(t))
       .when(Boolean(this.note), (e) => e.child(div().px(10).pb(8).text_size(11).text_color(t.muted).child(this.note)));
   }
