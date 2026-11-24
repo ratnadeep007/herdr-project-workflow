@@ -1,5 +1,5 @@
 import { View, div, svg, image } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, agents, panes, theme, run, exec, props, shared, setShared, openOverlay, closeOverlay, readTextFile, writeTextFile, setAgentOrder, terminals, hc, notify } from "herdr";
 
 // PROJECT_IDENTITY_BEGIN
@@ -162,6 +162,28 @@ print(json.dumps(labels))
 const ROLES = ["Planner", "Implementer", "Reviewer", "Tester"];
 const STATES = ["todo", "doing", "review", "done"];
 const TITLES = {todo:"Todo", doing:"In progress", review:"Review", done:"Done"};
+const RECENT_FILES = `import json, os, subprocess, sys
+root=os.path.realpath(sys.argv[1])
+def git(*args):
+    return subprocess.run(['git','--no-optional-locks',*args],cwd=root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+try:
+    names=git('ls-files','-co','--exclude-standard','-z').split(b'\\0')
+    changed={os.fsdecode(x[3:]) for x in git('status','--porcelain=v1','-z','--no-renames','--untracked-files=all').split(b'\\0') if len(x)>3}
+    rows=[];seen=set()
+    for raw in names:
+        if not raw: continue
+        name=os.fsdecode(raw)
+        if name in seen: continue
+        seen.add(name);path=os.path.realpath(os.path.join(root,name))
+        if os.path.commonpath([root,path])!=root or not os.path.isfile(path): continue
+        try: modified=os.stat(path).st_mtime
+        except OSError: continue
+        rows.append({'path':name,'changed':name in changed,'modified':modified})
+    rows.sort(key=lambda item:(not item['changed'],-item['modified'],item['path']))
+    print(json.dumps({'files':rows[:50000],'limited':len(rows)>50000}))
+except (OSError,subprocess.SubprocessError,ValueError) as error:
+    print(json.dumps({'error':str(error)}))
+`;
 function parse(text) {
   let fenced=false,current=null;
   const tasks=[];
@@ -185,9 +207,49 @@ function parse(text) {
 export default class ProjectHub extends View {
   init(_p, cx) {
     this.stacks = {}; this.roots = {}; this.taskCache = {}; this.tasks = []; this.text = null; this.error = null;
+    if(props()?.recent){
+      this.recentQuery="";this.recentFiles=[];this.recentLoading=true;
+      this.recentInput=InputState.new({placeholder:"Search project files"});
+      this.recentInput.on("change",(_e,cx)=>{this.recentQuery=this.recentInput.value();cx.notify();});
+      this.recentInput.on("submit",(_e,cx)=>{const file=this.recentMatches()[0];if(file)this.openRecent(file,cx);});
+      this.recentInput.focus();this.loadRecent(cx);return;
+    }
     if(this.isPopup()){this.popupHandle=cx.focus_handle();this.popupHandle.focus();}
     this.refresh(cx);
     cx.timer.every(5000, cx => this.refresh(cx));
+  }
+  loadRecent(cx) {
+    const p=props()||{};
+    cx.spawn(async cx=>{
+      try{
+        const result=await exec("python3",["-c",RECENT_FILES,p.root],{cwd:p.root,on:p.on||null,timeout:30000});
+        const data=JSON.parse(result.stdout);if(result.code!==0||data.error)throw new Error(data.error||result.stderr);
+        this.recentFiles=data.files;this.recentLimited=data.limited;
+      }catch(error){this.recentError=`Could not list files: ${String(error)}`;}
+      finally{this.recentLoading=false;cx.notify();}
+    });
+  }
+  recentMatches() {
+    const words=this.recentQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    return this.recentFiles.filter(f=>words.every(word=>f.path.toLowerCase().includes(word)));
+  }
+  openRecent(file,cx) {
+    const p=props();cx.spawn(async cx=>{const result=await workflowEditor({space:p.space,root:p.root,on:p.on,file:`${p.root}/${file.path}`});if(result)closeOverlay(p.overlay);cx.notify();});
+  }
+  recentView(t) {
+    const p=props(),matches=this.recentMatches();
+    return v_flex().w_full().h(560).min_h(0).p(14).gap(8).bg(t.popover).text_color(t.foreground)
+      .child(h_flex().items_center().child(div().flex_1().font_semibold().child("Recent project files"))
+        .child(this.button("recent-close","Close",()=>closeOverlay(p.overlay),t)))
+      .child(div().text_size(11).text_color(t.dim).child("Git changes first, then files by modification time. Activity is not attributed to an agent."))
+      .child(Input.new(this.recentInput).h(34).px(9).rounded(6).border_1().border_color(t.input).bg(t.background))
+      .child(v_flex().flex_1().min_h(0).overflow_y_scrollbar().gap(2).children(matches.slice(0,100).map((f,i)=>
+        h_flex().id(`recent-file-${i}`).px(8).py(6).gap(8).items_center().rounded(5).cursor_pointer().hover(e=>e.bg(t.hover))
+          .on_click((_e,cx)=>this.openRecent(f,cx))
+          .child(div().flex_1().min_w(0).truncate().child(f.path))
+          .child(div().text_size(10).text_color(t.dim).child(f.changed?"Git change":"Recent")))))
+      .when(Boolean(this.recentLoading||this.recentError||(!matches.length&&!this.recentLoading)),e=>e.child(div().text_size(11).text_color(t.dim).child(this.recentLoading?"Loading files…":this.recentError||"No matching files")))
+      .when(matches.length>100||this.recentLimited,e=>e.child(div().text_size(10).text_color(t.dim).child(this.recentLimited?"First 50,000 files indexed; refine search.":"First 100 matches shown; refine search.")));
   }
   project(s) { return this.roots[s.id] || s.folder; }
   active() { return spaces().find(s=>s.active); }
@@ -416,7 +478,8 @@ export default class ProjectHub extends View {
         add(`actions:${g.id}`,key,()=>h_flex().gap(4)
           .when(Boolean(cache?.tasks?.length),e=>e.child(this.button(`board-${g.id}`,"Tasks",()=>{run("space.select",{id:g.s.id});this.dismissPopup();openOverlay({mod:"project-hub",props:{board:true},kind:"dialog",width:1100,height:650});},t)))
           .child(this.button(`diff-${g.id}`,"Diff",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowDiff({space:g.s.id,spaceIds:g.spaces.map(s=>s.id),root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t))
-          .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t)),32);
+          .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t))
+          .child(this.button(`recent-${g.id}`,"Files",()=>{this.dismissPopup();openOverlay({mod:"project-hub",props:{recent:true,root,space:g.s.id,on:g.s.machine||null},kind:"dialog",width:650,height:560});},t).tooltip("Find recent project files")),32);
         const grouped=this.tabGroups(g.spaces,projectPanes,members,data);
         for(const kind of [...new Set([...ROLES,...members.map(a=>this.role(a,data.roles)),"Unassigned","Shells","Programs","Panels"])]) {
           const tabs=grouped.filter(group=>group.kind===kind);if(!tabs.length)continue;
@@ -535,6 +598,7 @@ export default class ProjectHub extends View {
   }
   render(cx) {
     const t=theme();
+    if(props()?.recent)return this.recentView(t);
     if(props()?.board) return this.board(cx,t);
     const popup=this.isPopup(),data=this.snapshot(),all=this.allAgents(data),groups=[],identities=shared("project.identities")||{};
     for(const s of data.spaces) {const id=JSON.stringify([s.machine,this.project(s)]);let g=groups.find(g=>g.id===id);if(!g){g={id,s,spaces:[]};groups.push(g);}g.spaces.push(s);}
@@ -568,7 +632,8 @@ export default class ProjectHub extends View {
           .when(Boolean(cache?.tasks?.some(task=>["doing","review"].includes(task.state))),e=>e.child(div().text_size(10).text_color(t.working).child(`${cache.tasks.filter(task=>task.state==="doing").length} in progress · ${cache.tasks.filter(task=>task.state==="review").length} in review`)))
           .child(h_flex().gap(4).when(Boolean(cache?.tasks?.length),e=>e.child(this.button(`board-${g.id}`,"Tasks",()=>{run("space.select",{id:g.s.id});this.dismissPopup();openOverlay({mod:"project-hub",props:{board:true},kind:"dialog",width:1100,height:650});},t)))
             .child(this.button(`diff-${g.id}`,"Diff",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowDiff({space:g.s.id,spaceIds:g.spaces.map(s=>s.id),root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t))
-            .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t)))
+            .child(this.button(`editor-${g.id}`,"Editor",(_e,cx)=>{cx.spawn(async cx=>{const result=await workflowEditor({space:g.s.id,root,on:g.s.machine});cx.notify();if(result)this.dismissPopup();});},t))
+            .child(this.button(`recent-${g.id}`,"Files",()=>openOverlay({mod:"project-hub",props:{recent:true,root,space:g.s.id,on:g.s.machine||null},kind:"dialog",width:650,height:560}),t).tooltip("Find recent project files")))
           .children([...new Set([...ROLES,...members.map(a=>this.role(a,data.roles)),"Unassigned","Shells","Programs","Panels"])].flatMap(kind=>{
             const tabs=this.tabGroups(g.spaces,projectPanes,roots,data).filter(group=>group.kind===kind);
             if(!tabs.length)return [];
