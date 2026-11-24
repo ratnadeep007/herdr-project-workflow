@@ -332,6 +332,7 @@ export default class Changes extends View {
         if(value.length>400000)throw new Error("File is too large to preview.");
         if(this.context!==context||this.open!==file||!this.showSource)return;
         const t=theme();
+        this.sourceValue=value;
         this.sourceEditor=EditorState.new({language:editorLanguage(file),value,readonly:true,line_numbers:true,folding:true,font_family:settings().font_family,syntax:{keyword:t.ansi5,string:t.ansi2,comment:t.dim,function:t.ansi4,type:t.ansi3,number:t.ansi6}});
       } catch(error) {if(this.context===context&&this.open===file&&this.showSource)this.sourceError=String(error);}
       finally {if(this.context===context&&this.open===file){this.sourceLoading=false;cx.notify();}}
@@ -427,8 +428,34 @@ export default class Changes extends View {
     if(!this.dragging)return;
     this.dragging=false;if(focus)this.input.focus();cx.notify();
   }
+  commentSourceSelection(cx) {
+    if(!this.sourceEditor||this.sourceLoading||this.sending)return;
+    const text=this.sourceValue,range=this.sourceEditor.selected_range();
+    const start=Math.max(0,Math.min(text.length,Math.min(range.start,range.end)));
+    const end=Math.max(start,Math.min(text.length,Math.max(range.start,range.end)));
+    const line=text.slice(0,start).split("\n").length;
+    const endLine=text.slice(0,end>start?end-1:start).split("\n").length;
+    const snippet=text.split("\n").slice(line-1,endLine).join("\n");
+    this.anchor={line,side:"new",endLine,endSide:"new",snippet,source:true};
+    this.selectionRange=null;this.note=null;this.input.focus();cx.notify();
+  }
   addComment(cx) {
     if(!this.message.trim()||!this.root||!this.open||this.loading||this.sending)return;
+    if(this.anchor?.source){
+      if(this.sourceChecking)return;
+      const root=this.root,file=this.open,on=this.on,context=this.context,snapshot=this.sourceValue,anchor={...this.anchor},message=this.message.trim();
+      this.sourceChecking=true;cx.notify();
+      cx.spawn(async cx=>{
+        try {
+          const current=await readTextFile(`${root}/${file}`,{on});
+          if(this.context!==context||this.open!==file)return;
+          if(current!==snapshot){this.note="File changed since preview loaded. Reopen the preview and select the lines again.";return;}
+          this.comments.push({id:`${Date.now()}-${this.comments.length}`,revision:"working tree",file,...anchor,message});
+          this.saveDrafts();this.message="";this.input.set_value("");this.anchor=null;this.note="Source comment added to review";
+        }catch(error){this.note=`Could not verify the source file: ${String(error)}`;}
+        finally{this.sourceChecking=false;cx.notify();}
+      });return;
+    }
     this.comments.push({id:`${Date.now()}-${this.comments.length}`,revision:this.revision||"working tree",file:this.open,...(this.anchor||{}),message:this.message.trim()});
     this.saveDrafts();this.message="";this.input.set_value("");this.anchor=null;this.note="Comment added to review";cx.notify();
   }
@@ -439,14 +466,20 @@ export default class Changes extends View {
     if(this.sending||!this.comments.length)return;
     if(!this.selectedAgent){this.chooseAgent=true;cx.notify();return;}
     if(!this.recipients.some(a=>a.address===this.selectedAgent)){this.note="Recipient is no longer available. Choose an agent.";this.selectedAgent=null;this.chooseAgent=true;cx.notify();return;}
-    const target=this.selectedAgent,batch=this.comments.slice(),root=this.root,payload=this.reviewMessage(batch);
+    const target=this.selectedAgent,batch=this.comments.slice(),root=this.root,on=this.on,payload=this.reviewMessage(batch);
     this.sending=true;this.note=null;
     cx.spawn(async cx=>{
+      let attempted=false;
       try {
-        const r=await hc(["send",target,payload,"--json"]);
+        for(const c of batch.filter(comment=>comment.source)){
+          const current=await readTextFile(`${root}/${c.file}`,{on});
+          if(current===null||current.split("\n").slice(c.line-1,c.endLine).join("\n")!==c.snippet)
+            throw new Error(`Source changed at ${c.file}:${c.line}; review this comment before sending.`);
+        }
+        attempted=true;const r=await hc(["send",target,payload,"--json"]);
         if(r.code!==0)throw new Error(r.stderr||r.stdout||"Send failed");
         if(this.root===root){const ids=new Set(batch.map(c=>c.id));this.comments=this.comments.filter(c=>!ids.has(c.id));this.saveDrafts();this.note=`Review sent to ${target}`;}
-      }catch(e){this.note=`Could not confirm delivery: ${String(e).slice(0,400)}. Comments kept; check the agent before retrying.`;}
+      }catch(e){this.note=attempted?`Could not confirm delivery: ${String(e).slice(0,400)}. Comments kept; check the agent before retrying.`:`Review not sent: ${String(e).slice(0,400)} Comments kept.`;}
       finally{this.sending=false;cx.notify();}
     });cx.notify();
   }
@@ -464,9 +497,9 @@ export default class Changes extends View {
     const selected=this.recipients.find(a=>a.address===this.selectedAgent);
     return v_flex().flex_none().border_t(1).border_color(t.border).p(10).gap(5)
       .child(div().text_size(11).text_color(t.dim).truncate().child(this.anchor?this.commentLocation({file:this.open,...this.anchor}):this.open?`${this.open} · drag across lines to select a range (or Shift-click)`:"Select a file to comment"))
-      .when(!this.anchor,e=>e.child(h_flex().gap(6).items_center()
+      .when(!this.anchor||this.anchor.source,e=>e.child(h_flex().gap(6).items_center()
         .child(Input.new(this.input).flex_1().h(32).px(8).rounded(6).border_1().border_color(t.input).bg(t.background).text_size(12))
-        .child(this.button("add-review-comment","Add",(_e,cx)=>this.addComment(cx),t,Boolean(this.message.trim()&&this.open&&!this.loading&&!this.sending)))))
+        .child(this.button("add-review-comment",this.sourceChecking?"Checking…":"Add",(_e,cx)=>this.addComment(cx),t,Boolean(this.message.trim()&&this.open&&!this.loading&&!this.sending&&!this.sourceChecking)))))
       .when(this.comments.length>0,e=>e.child(v_flex().id("review-comments").max_h(130).overflow_y_scrollbar().gap(4).children(this.comments.map(c=>h_flex().gap(5).items_center()
         .child(div().flex_1().min_w(0).truncate().text_size(11).tooltip(`${c.revision} · ${this.commentLocation(c)}\n${c.message}`).child(`${this.commentLocation(c)} · ${c.message}`))
         .child(this.button(`remove-${c.id}`,"×",(_e,cx)=>{if(this.sending)return;this.comments=this.comments.filter(x=>x.id!==c.id);this.saveDrafts();cx.notify();},t,!this.sending))))))
@@ -529,7 +562,7 @@ export default class Changes extends View {
         .child(div().px(5).py(1).rounded(4).border_1().border_color(t.border).text_size(10).text_color(t.muted).child(`${this.files.length} files`))
         .child(this.button("refresh-review","Refresh",(_e,cx)=>this.refresh(cx),t,!this.loading&&!this.sending))
         .child(this.button("open-nvim","Open in nvim",(_e,cx)=>this.openEditor(this.open,cx),t,Boolean(this.open&&this.root&&!this.loading)).tooltip("Open the working-tree file in this project's reusable Editor tab"))
-        .child(this.button("toggle-source",this.showSource?"Show diff":"Code preview",(_e,cx)=>{this.showSource=!this.showSource;if(this.showSource)this.previewSource(cx);cx.notify();},t,Boolean(this.open&&this.root&&!this.loading)).tooltip("Preview the current working-tree file with syntax highlighting"))
+        .child(this.button("toggle-source",this.showSource?"Show diff":"Code preview (beta)",(_e,cx)=>{this.showSource=!this.showSource;this.anchor=null;this.selectionRange=null;if(this.showSource)this.previewSource(cx);cx.notify();},t,Boolean(this.open&&this.root&&!this.loading)).tooltip("Preview the current working-tree file with syntax highlighting"))
         .child(div().flex_1()).child(div().text_size(11).text_color(t.ansi2).child(`+${add}`)).child(div().text_size(11).text_color(t.ansi1).child(`−${del}`)))
       .when(Boolean(this.showCommits),e=>e.child(v_flex().id("commit-list").h(160).flex_none().overflow_y_scrollbar().p(6)
         .child(this.button("working-tree","Working tree (uncommitted)",(_e,cx)=>this.chooseRevision(null,cx),t,!this.loading&&!this.sending))
@@ -554,7 +587,8 @@ export default class Changes extends View {
       .when(this.limited, el => el.child(div().px(12).py(4).text_size(11).text_color(t.dim).child("Showing the first 1,000 changed files")))
       .child(div().px(12).py(4).text_size(10).text_color(t.dim).child(`${this.rows.length} diff lines · drag across lines or Shift-click + to select a range`))
       .when(Boolean(this.showSource),e=>e.child(v_flex().flex_1().min_h(0).gap(4)
-        .child(div().px(12).text_size(10).text_color(t.dim).child("Working-tree source · reopen preview to refresh · select lines and comment in diff view"))
+        .child(h_flex().px(12).gap(6).items_center().child(div().flex_1().text_size(10).text_color(t.dim).child("Beta · working-tree source · reopen preview to refresh"))
+          .child(this.button("comment-source-selection","Comment selection",(_e,cx)=>this.commentSourceSelection(cx),t,Boolean(this.sourceEditor&&!this.sourceLoading&&!this.sending))))
         .when(Boolean(this.sourceEditor),e=>e.child(Editor.new(this.sourceEditor).flex_1().min_h(0)))
         .when(!this.sourceEditor,e=>e.child(div().p(12).text_color(t.dim).child(this.sourceLoading?"Loading source…":this.sourceError||"Select a file")))))
       .when(!this.showSource,e=>e.child(v_flex().relative().flex_1().min_h(0)
